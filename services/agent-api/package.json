@@ -18,10 +18,12 @@
   },
   "dependencies": {
     "@tulu/shared": "workspace:*",
-    "openai": "^7.15.0"
+    "openai": "^7.15.0",
+    "ws": "^8.18.3"
   },
   "devDependencies": {
     "@types/node": "^22.20.2",
+    "@types/ws": "^8.18.1",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2"
   }
