@@ -63,19 +63,12 @@ function getSessionEndpoint() {
   return `${configuredBaseUrl ?? ""}/api/live/sessions`;
 }
 
-function openingInstructions(language: LiveVoiceLanguage) {
-  if (language === "sw") {
-    return [
-      "Speak first, in clear and natural Kiswahili.",
-      "Begin with this complete disclosure: Habari, mimi ni Tulu, msaidizi wa akili bandia wa kupata huduma za kliniki. Mimi si daktari wala huduma ya dharura. Ikiwa mtu yuko katika hatari ya haraka, wasiliana na huduma za dharura za eneo lako sasa. Ninaweza kukusaidiaje leo?",
-      "After speaking the disclosure, stop and listen for the caller. Ask one short question at a time.",
-    ].join(" ");
-  }
-
+function openingInstructions() {
   return [
-    "Speak first, in clear and natural English.",
-    "Begin with this complete disclosure: Hello, I’m Tulu, an AI clinic access assistant. I’m not a doctor or emergency service. If someone is in immediate danger, contact local emergency services now. How can I help you today?",
-    "After speaking the disclosure, stop and listen for the caller. Ask one short question at a time.",
+    "Speak first. Do not wait for the caller.",
+    "Introduce yourself as Tulu, an AI clinic-access assistant, not a doctor or emergency service.",
+    "Say this exact bilingual language menu, clearly and without adding another question: For English, press 1. Kwa Kiswahili, bonyeza 2.",
+    "Then stop speaking and wait for a keypad selection. Do not begin the health conversation or ask how you can help until the caller selects a language.",
   ].join(" ");
 }
 
@@ -300,7 +293,7 @@ export function useLiveVoiceCall() {
               type: "session.instructions.append",
               event_id: eventId,
               delegation_id: null,
-              content: openingInstructions(languageRef.current),
+              content: openingInstructions(),
             }),
           );
         } else {
