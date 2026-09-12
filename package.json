@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "pnpm run dev:stack",
-    "dev:stack": "pnpm --parallel --filter @tulu/agent-api --filter @tulu/mobile dev",
+    "dev:stack": "pnpm --parallel --filter @tulu/agent-api --filter @tulu/mobile --filter @tulu/main-dash dev",
     "dev:agent": "pnpm --filter @tulu/agent-api dev",
     "dev:mobile": "pnpm --filter @tulu/mobile dev",
     "dev:dash": "pnpm --filter @tulu/main-dash dev",

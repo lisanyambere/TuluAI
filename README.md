@@ -171,13 +171,13 @@ OPENAI_API_KEY=your-project-service-account-key
 
 Never put this key in `apps/mobile`, prefix it with `VITE_`, paste it into browser code, log it, or commit the `.env` file. Vite exposes `VITE_*` variables to browser-delivered JavaScript.
 
-Start the caller app and Agent API together:
+Start the caller app, Agent API, and facility dashboard together:
 
 ```bash
 pnpm dev
 ```
 
-The mobile app normally opens at `http://localhost:5173`, and the Agent API listens at `http://127.0.0.1:8787`. Vite proxies local `/api` requests to the Agent API. Open the mobile URL, dial or select the demo line, review the consent notice, continue, and allow microphone access when the browser asks.
+The mobile app normally opens at `http://localhost:5173`, the facility dashboard at `http://localhost:3000`, and the Agent API listens at `http://127.0.0.1:8787`. Vite proxies local `/api` requests to the Agent API. Open the mobile URL, dial or select the demo line, review the consent notice, continue, and allow microphone access when the browser asks.
 
 You can confirm that the service is running without creating a chargeable voice session:
 
