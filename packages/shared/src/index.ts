@@ -69,3 +69,26 @@ export const REQUEST_STATUS_LABELS: Record<RequestStatus, string> = {
   resolved: "Resolved",
   rejected: "Unavailable / rejected",
 };
+
+export type FacilityProfile = {
+  id: string;
+  name: string;
+  location: string;
+  openingHours: string;
+  services: string;
+  verificationOwner: string;
+  lastReviewedAt: string;
+};
+
+export type DashboardState = {
+  facility: FacilityProfile;
+  requests: TuluRequest[];
+};
+
+export type DashboardCommand =
+  | { type: "update_facility"; updates: Partial<FacilityProfile> }
+  | { type: "set_status"; id: string; status: RequestStatus; action: string }
+  | { type: "confirm_request"; id: string }
+  | { type: "reject_request"; id: string }
+  | { type: "assign_request"; id: string; assignee?: string }
+  | { type: "add_note"; id: string; body: string };

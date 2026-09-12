@@ -1,14 +1,6 @@
-import type { TuluRequest } from "@tulu/shared";
+import type { FacilityProfile, TuluRequest } from "@tulu/shared";
 
-export type FacilityProfile = {
-  id: string;
-  name: string;
-  location: string;
-  openingHours: string;
-  services: string;
-  verificationOwner: string;
-  lastReviewedAt: string;
-};
+export type { FacilityProfile } from "@tulu/shared";
 
 export const MOCK_FACILITY: FacilityProfile = {
   id: "maralal-chc",

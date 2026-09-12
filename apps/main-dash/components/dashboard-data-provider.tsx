@@ -1,8 +1,13 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import type { RequestStatus, TuluRequest } from "@tulu/shared";
-import type { FacilityProfile } from "@/lib/mock-data";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import type {
+  DashboardCommand,
+  DashboardState,
+  FacilityProfile,
+  RequestStatus,
+  TuluRequest,
+} from "@tulu/shared";
 
 type DashboardDataContextValue = {
   requests: TuluRequest[];
@@ -40,7 +45,34 @@ export function DashboardDataProvider({
   const [requests, setRequests] = useState(initialRequests);
   const [facility, setFacility] = useState(initialFacility);
 
+  const applyState = useCallback((state: DashboardState) => {
+    setRequests(state.requests);
+    setFacility(state.facility);
+  }, []);
+
+  const sendCommand = useCallback(async (command: DashboardCommand) => {
+    const response = await fetch("/agent-api/api/dashboard/commands", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(command),
+    });
+    if (response.ok) applyState((await response.json()) as DashboardState);
+  }, [applyState]);
+
+  useEffect(() => {
+    const refresh = async () => {
+      const response = await fetch("/agent-api/api/dashboard/state", {
+        cache: "no-store",
+      });
+      if (response.ok) applyState((await response.json()) as DashboardState);
+    };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), 2_000);
+    return () => window.clearInterval(interval);
+  }, [applyState]);
+
   const setRequestStatus = useCallback((id: string, status: RequestStatus, action: string) => {
+    void sendCommand({ type: "set_status", id, status, action });
     setRequests((current) =>
       current.map((request) =>
         request.id !== id
@@ -55,9 +87,10 @@ export function DashboardDataProvider({
             },
       ),
     );
-  }, []);
+  }, [sendCommand]);
 
   const confirmRequest = useCallback((id: string) => {
+    void sendCommand({ type: "confirm_request", id });
     setRequests((current) =>
       current.map((request) =>
         request.id !== id
@@ -77,9 +110,10 @@ export function DashboardDataProvider({
             },
       ),
     );
-  }, []);
+  }, [sendCommand]);
 
   const rejectRequest = useCallback((id: string) => {
+    void sendCommand({ type: "reject_request", id });
     setRequests((current) =>
       current.map((request) =>
         request.id !== id
@@ -99,9 +133,14 @@ export function DashboardDataProvider({
             },
       ),
     );
-  }, []);
+  }, [sendCommand]);
 
   const assignRequest = useCallback((id: string, assignee: string | undefined) => {
+    void sendCommand({
+      type: "assign_request",
+      id,
+      ...(assignee ? { assignee } : {}),
+    });
     setRequests((current) =>
       current.map((request) =>
         request.id !== id
@@ -121,11 +160,12 @@ export function DashboardDataProvider({
             },
       ),
     );
-  }, []);
+  }, [sendCommand]);
 
   const addNote = useCallback((id: string, body: string) => {
     const trimmedBody = body.trim();
     if (!trimmedBody) return;
+    void sendCommand({ type: "add_note", id, body: trimmedBody });
 
     setRequests((current) =>
       current.map((request) =>
@@ -144,11 +184,12 @@ export function DashboardDataProvider({
             },
       ),
     );
-  }, []);
+  }, [sendCommand]);
 
   const updateFacility = useCallback((updates: Partial<FacilityProfile>) => {
+    void sendCommand({ type: "update_facility", updates });
     setFacility((current) => ({ ...current, ...updates, lastReviewedAt: eventTime() }));
-  }, []);
+  }, [sendCommand]);
 
   const value = useMemo(
     () => ({ requests, facility, setRequestStatus, confirmRequest, rejectRequest, assignRequest, addNote, updateFacility }),
