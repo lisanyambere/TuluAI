@@ -6,6 +6,7 @@ import {
   InvalidLiveSessionResponseError,
   type OpenAILiveSdk,
 } from "./live/openai-live-session-client.js";
+import type { LiveToolRuntime } from "./live/live-tool-runtime.js";
 
 describe("OpenAI Live SDK adapter", () => {
   it("uses the official GPT-Live WebRTC and Responses delegation payload", async () => {
@@ -93,5 +94,64 @@ describe("OpenAI Live SDK adapter", () => {
       }),
       InvalidLiveSessionResponseError,
     );
+  });
+
+  it("only exposes tool schemas through an enabled server runtime", async () => {
+    let payload: Parameters<OpenAILiveSdk["live"]["create"]>[0] | undefined;
+    const attachments: Array<{ sessionId: string; language: string }> = [];
+    const sdk: OpenAILiveSdk = {
+      live: {
+        create: async (input) => {
+          payload = input;
+          return {
+            session: { id: "sess_tools" },
+            transport: { type: "webrtc", sdp: "answer-sdp" },
+          };
+        },
+      },
+    };
+    const toolRuntime: LiveToolRuntime = {
+      enabled: true,
+      definitions: [
+        {
+          type: "function",
+          name: "test_tool",
+          description: "A test tool",
+          strict: true,
+          parameters: {
+            type: "object",
+            properties: {},
+            required: [],
+            additionalProperties: false,
+          },
+        },
+      ],
+      attach: (input) => attachments.push(input),
+    };
+    const client = createOpenAILiveSessionClient(
+      "not-a-real-key",
+      sdk,
+      toolRuntime,
+    );
+
+    await client.create({
+      sdp: "offer-sdp",
+      language: "sw",
+      liveModel: "gpt-live-1",
+      backendModel: "gpt-5.6-terra",
+      liveInstructions: "live instructions",
+      backendInstructions: "backend instructions",
+    });
+
+    assert.deepEqual(payload?.session.delegation.responses.tools, [
+      toolRuntime.definitions[0],
+    ]);
+    assert.equal(
+      payload?.session.delegation.responses.parallel_tool_calls,
+      false,
+    );
+    assert.deepEqual(attachments, [
+      { sessionId: "sess_tools", language: "sw" },
+    ]);
   });
 });
