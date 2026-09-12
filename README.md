@@ -25,7 +25,7 @@ Tulu is separated into three independently deployable product surfaces plus a sh
 
 | Surface | Audience | Responsibility | Status |
 | --- | --- | --- | --- |
-| Mobile caller experience | Members of the public and hackathon judges | Simulates dialing a Tulu number and runs the real browser voice session | Working voice MVP |
+| Mobile caller experience | Members of the public that need access to medical information | Simulates dialing a Tulu number and runs the real browser voice session | Working voice MVP |
 | Facility dashboard | Authorized facility teams | Reviews requests, updates operational information, confirms outcomes, and coordinates human follow-up | Workspace reserved; not implemented |
 | Agent API | Trusted server-side infrastructure | Validates session requests, keeps the OpenAI key private, constructs prompts, and creates GPT-Live sessions | Working session gateway and prompt layer; no tools or persistence |
 | Shared contracts | Mobile and Agent API | Defines the validated Live-session request, response, language, and error contracts | Implemented for the voice handshake |

@@ -66,7 +66,7 @@ function getSessionEndpoint() {
 function openingInstructions() {
   return [
     "Speak first. Do not wait for the caller.",
-    "Introduce yourself as Tulu, an AI demonstration assistant, not a doctor or emergency service.",
+    "Introduce yourself as Tulu, an AI clinic-access assistant, not a doctor or emergency service.",
     "Say this exact bilingual language menu, clearly and without adding another question: For English, press 1. Kwa Kiswahili, bonyeza 2.",
     "Then stop speaking and wait for a keypad selection. Do not begin the health conversation or ask how you can help until the caller selects a language.",
   ].join(" ");
