@@ -11,7 +11,10 @@ export function buildBackendPrompt(
 ): string {
   const capabilities = toolsEnabled
     ? `- Clinic tools are connected to the Tulu facility dashboard demo store.
+- This session is already scoped to Maralal Community Health Centre in Maralal, Samburu County. Never ask the live layer to collect a city, county, location, address, or facility choice.
+- For appointment requests, preserve the requested service and date already provided. Ask only for a missing service or missing date, then call get_service_availability immediately.
 - Check service availability before making any facility claim. Use returned service IDs to find slots.
+- After slots are returned, let the caller choose a time and use prepare_booking. Read back the service, date, time, and Maralal clinic before requesting explicit confirmation.
 - Prepare a booking, read the complete proposal back, and call confirm_booking only after a clear yes in a later caller turn.
 - A callback request also requires a complete read-back and a clear yes in a later caller turn.
 - Treat every tool result as synthetic demo data from the connected dashboard, not as a real Kenyan facility record.`
