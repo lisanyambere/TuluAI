@@ -139,11 +139,6 @@ function App() {
     setDialedDuringCall("");
   }, []);
 
-  const startCall = useCallback(() => {
-    if (!number) return;
-    setStage("consent");
-  }, [number]);
-
   const connectCall = useCallback(() => {
     resetControls();
     setDuration(0);
@@ -153,6 +148,11 @@ function App() {
       consentAcknowledged: true,
     });
   }, [language, resetControls, voice]);
+
+  const startCall = useCallback(() => {
+    if (!number) return;
+    connectCall();
+  }, [connectCall, number]);
 
   const endCall = useCallback(() => {
     setShowKeypad(false);
@@ -233,6 +233,10 @@ function App() {
       if ((stage === "dialing" || stage === "active") && event.key === "Escape") {
         endCall();
       }
+
+      if (stage === "active" && (event.key === "1" || event.key === "2")) {
+        handleInCallKey(event.key);
+      }
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -242,12 +246,12 @@ function App() {
   const handleInCallKey = (key: string) => {
     setDialedDuringCall((current) => `${current}${key}`.slice(-8));
     if (key === "1") {
-      setLanguage("SW");
-      voice.changeLanguage("sw");
-    }
-    if (key === "2") {
       setLanguage("EN");
       voice.changeLanguage("en");
+    }
+    if (key === "2") {
+      setLanguage("SW");
+      voice.changeLanguage("sw");
     }
   };
 
@@ -480,7 +484,7 @@ function App() {
                     className="in-call-keypad"
                     ref={inCallKeypadRef}
                     tabIndex={-1}
-                    aria-label="In-call keypad. Press 1 for Kiswahili or 2 for English."
+                    aria-label="In-call keypad. Press 1 for English or 2 for Kiswahili."
                   >
                     <div className="in-call-keypad__header">
                       <div>
@@ -497,7 +501,7 @@ function App() {
                       </button>
                     </div>
                     <Keypad onKey={handleInCallKey} compact />
-                    <p>1 · Kiswahili&nbsp;&nbsp; 2 · English&nbsp;&nbsp; Other tones are demo only</p>
+                    <p>1 · English&nbsp;&nbsp; 2 · Kiswahili&nbsp;&nbsp; Other tones are demo only</p>
                   </div>
                 ) : (
                   <div className="agent-presence">

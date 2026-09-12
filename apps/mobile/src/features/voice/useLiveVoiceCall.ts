@@ -63,19 +63,12 @@ function getSessionEndpoint() {
   return `${configuredBaseUrl ?? ""}/api/live/sessions`;
 }
 
-function openingInstructions(language: LiveVoiceLanguage) {
-  if (language === "sw") {
-    return [
-      "Speak first, in clear and natural Kiswahili.",
-      "Begin with this complete disclosure: Habari, mimi ni Tulu, msaidizi wa majaribio wa akili bandia—si daktari wala huduma ya dharura. Simu hii inatumia maikrofoni yako. Ninaweza kueleza jinsi Tulu itakavyosaidia kukagua taarifa za kituo cha afya, lakini mfumo huu wa majaribio haujaunganishwa na kituo chochote bado. Ikiwa mtu yuko katika hatari ya haraka, wasiliana na huduma za dharura za eneo lako sasa na usingoje kwenye simu hii. Ninaweza kukusaidiaje leo?",
-      "After speaking the disclosure, stop and listen for the caller. Ask one short question at a time.",
-    ].join(" ");
-  }
-
+function openingInstructions() {
   return [
-    "Speak first, in clear and natural English.",
-    "Begin with this complete disclosure: Hello, I’m Tulu, an AI demonstration assistant—not a doctor or emergency service. This call uses your microphone. I can explain how Tulu will help check facility information, but this demonstration is not connected to a health facility yet. If someone is in immediate danger, contact local emergency services now and do not wait on this call. How can I help you today?",
-    "After speaking the disclosure, stop and listen for the caller. Ask one short question at a time.",
+    "Speak first. Do not wait for the caller.",
+    "Introduce yourself as Tulu, an AI demonstration assistant, not a doctor or emergency service.",
+    "Say this exact bilingual language menu, clearly and without adding another question: For English, press 1. Kwa Kiswahili, bonyeza 2.",
+    "Then stop speaking and wait for a keypad selection. Do not begin the health conversation or ask how you can help until the caller selects a language.",
   ].join(" ");
 }
 
@@ -300,7 +293,7 @@ export function useLiveVoiceCall() {
               type: "session.instructions.append",
               event_id: eventId,
               delegation_id: null,
-              content: openingInstructions(languageRef.current),
+              content: openingInstructions(),
             }),
           );
         } else {
@@ -660,6 +653,17 @@ export function useLiveVoiceCall() {
         event_id: createEventId(),
         delegation_id: null,
         content,
+      }),
+    );
+    channel.send(
+      JSON.stringify({
+        type: "session.commentary.append",
+        event_id: createEventId(),
+        delegation_id: null,
+        content:
+          language === "sw"
+            ? "The caller pressed 2 for Kiswahili. Acknowledge the selection and continue the conversation in Kiswahili now."
+            : "The caller pressed 1 for English. Acknowledge the selection and continue the conversation in English now.",
       }),
     );
     setActivityMessage(language === "sw" ? "Kiswahili selected" : "English selected");
