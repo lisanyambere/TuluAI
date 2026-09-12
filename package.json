@@ -1,0 +1,18 @@
+{
+  "name": "tulu-ai",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.28.1",
+  "engines": {
+    "node": ">=22.12.0",
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @tulu/mobile dev",
+    "dev:mobile": "pnpm --filter @tulu/mobile dev",
+    "build": "pnpm -r --if-present run build",
+    "build:mobile": "pnpm --filter @tulu/mobile build",
+    "preview:mobile": "pnpm --filter @tulu/mobile preview",
+    "typecheck": "pnpm -r --if-present run typecheck"
+  }
+}
