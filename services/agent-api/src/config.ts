@@ -65,7 +65,10 @@ function readOrigins(env: NodeJS.ProcessEnv): ReadonlySet<string> {
     "http://localhost:3000",
     "http://127.0.0.1:3000",
   ];
-  const candidates = env.WEB_ORIGINS?.split(",") ?? fallback;
+  const candidates = [
+    ...fallback,
+    ...(env.WEB_ORIGINS?.split(",") ?? []),
+  ];
   const origins = new Set<string>();
 
   for (const candidate of candidates) {

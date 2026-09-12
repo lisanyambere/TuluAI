@@ -218,7 +218,19 @@ export function createApiHandler({
       }
 
       const origin = requestOrigin(request);
-      if (!origin || !config.allowedOrigins.has(origin)) {
+      const isDashboardRoute =
+        isDashboardStateRoute || isDashboardCommandRoute;
+      const remoteAddress = request.socket.remoteAddress;
+      const isLocalDashboardProxy =
+        isDashboardRoute &&
+        !origin &&
+        (remoteAddress === "127.0.0.1" ||
+          remoteAddress === "::1" ||
+          remoteAddress === "::ffff:127.0.0.1");
+      if (
+        !isLocalDashboardProxy &&
+        (!origin || !config.allowedOrigins.has(origin))
+      ) {
         sendError(
           response,
           403,
@@ -228,7 +240,7 @@ export function createApiHandler({
         );
         return;
       }
-      const allowedCorsHeaders = corsHeaders(origin);
+      const allowedCorsHeaders = origin ? corsHeaders(origin) : {};
       safeResponseHeaders = allowedCorsHeaders;
 
       if (request.method === "OPTIONS") {
