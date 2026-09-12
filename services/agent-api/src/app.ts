@@ -1,8 +1,11 @@
 import {
   LIVE_SESSION_MAX_SDP_LENGTH,
+  REQUEST_STATUSES,
   validateLiveSessionRequest,
   type ApiErrorCode,
   type ApiErrorResponse,
+  type DashboardCommand,
+  type DashboardState,
 } from "@tulu/shared";
 import { randomUUID } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
@@ -23,6 +26,11 @@ export interface SafeLogger {
 export interface AppDependencies {
   config: AgentApiConfig;
   liveSessionClient: LiveSessionClient;
+  dashboardStore?: {
+    getState(): DashboardState;
+    applyCommand(command: DashboardCommand): DashboardState;
+  };
+  toolsEnabled?: boolean;
   rateLimiter?: FixedWindowRateLimiter;
   logger?: SafeLogger;
 }
@@ -72,11 +80,61 @@ function sendError(
 function corsHeaders(origin: string): Record<string, string> {
   return {
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     "Access-Control-Max-Age": "600",
     Vary: "Origin",
   };
+}
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+function parseDashboardCommand(value: unknown): DashboardCommand | undefined {
+  if (!isRecord(value) || typeof value.type !== "string") return undefined;
+
+  if (value.type === "update_facility" && isRecord(value.updates)) {
+    const updates = Object.fromEntries(
+      ["location", "openingHours", "services"]
+        .filter((key) => typeof value.updates[key] === "string")
+        .map((key) => [key, value.updates[key]]),
+    );
+    return { type: value.type, updates };
+  }
+
+  if (typeof value.id !== "string" || !value.id.trim()) return undefined;
+  if (
+    value.type === "set_status" &&
+    typeof value.status === "string" &&
+    REQUEST_STATUSES.includes(
+      value.status as (typeof REQUEST_STATUSES)[number],
+    ) &&
+    typeof value.action === "string"
+  ) {
+    return {
+      type: value.type,
+      id: value.id,
+      status: value.status as (typeof REQUEST_STATUSES)[number],
+      action: value.action,
+    };
+  }
+  if (value.type === "confirm_request" || value.type === "reject_request") {
+    return { type: value.type, id: value.id };
+  }
+  if (value.type === "assign_request") {
+    if (value.assignee !== undefined && typeof value.assignee !== "string") {
+      return undefined;
+    }
+    return {
+      type: value.type,
+      id: value.id,
+      ...(value.assignee ? { assignee: value.assignee } : {}),
+    };
+  }
+  if (value.type === "add_note" && typeof value.body === "string") {
+    return { type: value.type, id: value.id, body: value.body };
+  }
+  return undefined;
 }
 
 function requestOrigin(request: IncomingMessage): string | undefined {
@@ -125,6 +183,8 @@ async function readJsonBody(request: IncomingMessage): Promise<unknown> {
 export function createApiHandler({
   config,
   liveSessionClient,
+  dashboardStore,
+  toolsEnabled = false,
   rateLimiter = new FixedWindowRateLimiter(
     config.rateLimitMax,
     config.rateLimitWindowMs,
@@ -144,7 +204,15 @@ export function createApiHandler({
         return;
       }
 
-      if (url.pathname !== "/api/live/sessions") {
+      const isLiveSessionRoute = url.pathname === "/api/live/sessions";
+      const isDashboardStateRoute = url.pathname === "/api/dashboard/state";
+      const isDashboardCommandRoute =
+        url.pathname === "/api/dashboard/commands";
+      if (
+        !isLiveSessionRoute &&
+        !isDashboardStateRoute &&
+        !isDashboardCommandRoute
+      ) {
         sendError(response, 404, "not_found", "Route not found.", requestId);
         return;
       }
@@ -169,7 +237,76 @@ export function createApiHandler({
         return;
       }
 
-      if (request.method !== "POST") {
+      if (
+        isDashboardStateRoute &&
+        request.method === "GET" &&
+        dashboardStore
+      ) {
+        sendJson(response, 200, dashboardStore.getState(), allowedCorsHeaders);
+        return;
+      }
+
+      if (
+        isDashboardCommandRoute &&
+        request.method === "POST" &&
+        dashboardStore
+      ) {
+        if (
+          request.headers["content-type"]
+            ?.split(";", 1)[0]
+            ?.trim()
+            .toLowerCase() !== "application/json"
+        ) {
+          sendError(
+            response,
+            415,
+            "unsupported_media_type",
+            "Content-Type must be application/json.",
+            requestId,
+            undefined,
+            allowedCorsHeaders,
+          );
+          return;
+        }
+
+        let body: unknown;
+        try {
+          body = await readJsonBody(request);
+        } catch {
+          sendError(
+            response,
+            400,
+            "invalid_request",
+            "Request body must be valid JSON.",
+            requestId,
+            undefined,
+            allowedCorsHeaders,
+          );
+          return;
+        }
+        const command = parseDashboardCommand(body);
+        if (!command) {
+          sendError(
+            response,
+            400,
+            "invalid_request",
+            "Invalid dashboard command.",
+            requestId,
+            undefined,
+            allowedCorsHeaders,
+          );
+          return;
+        }
+        sendJson(
+          response,
+          200,
+          dashboardStore.applyCommand(command),
+          allowedCorsHeaders,
+        );
+        return;
+      }
+
+      if (!isLiveSessionRoute || request.method !== "POST") {
         sendError(
           response,
           405,
@@ -275,7 +412,10 @@ export function createApiHandler({
         liveModel: config.liveModel,
         backendModel: config.backendModel,
         liveInstructions: buildLivePrompt(validated.data.language),
-        backendInstructions: buildBackendPrompt(validated.data.language),
+        backendInstructions: buildBackendPrompt(
+          validated.data.language,
+          toolsEnabled,
+        ),
       });
 
       logger.info("Live session created", {

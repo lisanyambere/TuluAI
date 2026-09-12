@@ -8,6 +8,10 @@ import type {
   CreateLiveSessionInput,
   LiveSessionClient,
 } from "./live-session-client.js";
+import {
+  disabledLiveToolRuntime,
+  type LiveToolRuntime,
+} from "./live-tool-runtime.js";
 
 export interface OpenAILiveSdk {
   live: {
@@ -27,6 +31,14 @@ export interface OpenAILiveSdk {
           responses: {
             model: "gpt-5.6-terra";
             instructions: string;
+            parallel_tool_calls?: false;
+            tools?: Array<{
+              type: "function";
+              name: string;
+              description: string;
+              strict: true;
+              parameters: Readonly<Record<string, unknown>>;
+            }>;
           };
         };
       };
@@ -48,6 +60,7 @@ export class InvalidLiveSessionResponseError extends Error {
 export function createOpenAILiveSessionClient(
   apiKey: string,
   sdk?: OpenAILiveSdk,
+  toolRuntime: LiveToolRuntime = disabledLiveToolRuntime,
 ): LiveSessionClient {
   const openAI = sdk ? undefined : new OpenAI({ apiKey, maxRetries: 0 });
   const client: OpenAILiveSdk =
@@ -96,6 +109,15 @@ export function createOpenAILiveSessionClient(
             responses: {
               model: input.backendModel,
               instructions: input.backendInstructions,
+              ...(toolRuntime.enabled
+                ? {
+                    parallel_tool_calls: false as const,
+                    tools: toolRuntime.definitions.map((definition) => ({
+                      ...definition,
+                      parameters: { ...definition.parameters },
+                    })),
+                  }
+                : {}),
             },
           },
         },
@@ -107,6 +129,10 @@ export function createOpenAILiveSessionClient(
 
       const validated = validateLiveSessionResponse(result);
       if (!validated.success) throw new InvalidLiveSessionResponseError();
+      toolRuntime.attach({
+        sessionId: validated.data.session.id,
+        language: input.language,
+      });
       return validated.data;
     },
   };
