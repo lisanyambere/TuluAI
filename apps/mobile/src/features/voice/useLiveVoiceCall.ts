@@ -300,7 +300,7 @@ export function useLiveVoiceCall() {
               type: "session.instructions.append",
               event_id: eventId,
               delegation_id: null,
-              content: openingInstructions(languageRef.current),
+              content: openingInstructions(),
             }),
           );
         } else {
@@ -660,6 +660,17 @@ export function useLiveVoiceCall() {
         event_id: createEventId(),
         delegation_id: null,
         content,
+      }),
+    );
+    channel.send(
+      JSON.stringify({
+        type: "session.commentary.append",
+        event_id: createEventId(),
+        delegation_id: null,
+        content:
+          language === "sw"
+            ? "The caller pressed 2 for Kiswahili. Acknowledge the selection and continue the conversation in Kiswahili now."
+            : "The caller pressed 1 for English. Acknowledge the selection and continue the conversation in English now.",
       }),
     );
     setActivityMessage(language === "sw" ? "Kiswahili selected" : "English selected");

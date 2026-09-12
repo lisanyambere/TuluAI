@@ -44,7 +44,7 @@ The implemented MVP supports:
 - A spoken opening disclosure that identifies Tulu as an AI demonstration, not a doctor or emergency service, and states that no health facility is connected yet.
 - Live caller and Tulu captions from GPT-Live transcript events.
 - Working microphone mute, output-speaker toggle, call timer, and graceful session close.
-- In-call keypad shortcuts: `1` switches the agent to Kiswahili and `2` switches it to English.
+- In-call keypad shortcuts: `1` selects English and `2` selects Kiswahili.
 - A final receipt that clearly states that no real healthcare request was placed.
 - Physical keyboard input for digits, Backspace, Enter, and Escape.
 - Responsive layouts, accessible labels, focus management, reduced-motion support, and large primary touch targets.
