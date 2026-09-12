@@ -2,14 +2,34 @@
 
 import Link from "next/link";
 import { useState, type FormEvent } from "react";
-import { StatusBadge, VerificationBadge } from "@/components/status-badge";
+import { CommunicationBadge, StatusBadge, VerificationBadge } from "@/components/status-badge";
 import { useDashboardData } from "@/components/dashboard-data-provider";
 
+type ReasonAction = "reject" | "escalate";
+
+function followUpMethodLabel(method: "voice_follow_up" | "callback" | undefined) {
+  if (method === "callback") return "callback";
+  if (method === "voice_follow_up") return "voice follow-up";
+  return "staff follow-up";
+}
+
 export function RequestDetail({ requestId }: { requestId: string }) {
-  const { requests, setRequestStatus, confirmRequest, rejectRequest, assignRequest, addNote } = useDashboardData();
+  const {
+    requests,
+    setRequestStatus,
+    confirmRequest,
+    rejectRequest,
+    escalateRequest,
+    flagClarification,
+    recordCallerFollowUp,
+    assignRequest,
+    addNote,
+  } = useDashboardData();
   const request = requests.find((item) => item.id === requestId);
   const [notice, setNotice] = useState("");
   const [noteDraft, setNoteDraft] = useState("");
+  const [reasonAction, setReasonAction] = useState<ReasonAction | null>(null);
+  const [reasonDraft, setReasonDraft] = useState("");
 
   if (!request) {
     return (
@@ -23,7 +43,17 @@ export function RequestDetail({ requestId }: { requestId: string }) {
   }
 
   const showResolutionAction = request.status === "confirmed" || request.status === "rejected";
-  const actionHeading = request.status === "resolved" ? "Outcome recorded" : request.status === "escalated" ? "Human follow-up needed" : "What needs to happen next?";
+  const canChooseOutcome = !["resolved", "confirmed", "rejected"].includes(request.status);
+  const callerFollowUpIsDue = ["ready_to_communicate", "follow_up_due"].includes(request.callerCommunication.state);
+  const canRecordCallerFollowUp = callerFollowUpIsDue && ["confirmed", "rejected", "awaiting_clarification", "escalated"].includes(request.status);
+  const actionHeading =
+    request.status === "resolved"
+      ? "Outcome recorded"
+      : reasonAction
+        ? "Reason required"
+        : request.status === "escalated"
+          ? "Supervisor follow-up needed"
+          : "What needs to happen next?";
 
   const notify = (message: string) => {
     setNotice(`${message} This demo change is local to the browser.`);
@@ -35,6 +65,28 @@ export function RequestDetail({ requestId }: { requestId: string }) {
     addNote(request.id, noteDraft);
     setNoteDraft("");
     notify("Internal note added.");
+  };
+
+  const handleReasonSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const reason = reasonDraft.trim();
+    if (!reasonAction || !reason) return;
+
+    if (reasonAction === "reject") {
+      rejectRequest(request.id, reason);
+      notify("Availability marked unavailable and queued for caller follow-up.");
+    } else {
+      escalateRequest(request.id, reason);
+      notify("Request escalated with a recorded reason.");
+    }
+
+    setReasonAction(null);
+    setReasonDraft("");
+  };
+
+  const startReasonAction = (action: ReasonAction) => {
+    setReasonAction(action);
+    setReasonDraft("");
   };
 
   return (
@@ -56,6 +108,7 @@ export function RequestDetail({ requestId }: { requestId: string }) {
         <div className="detail-heading__status">
           <StatusBadge status={request.status} />
           <VerificationBadge state={request.verification.state} />
+          <CommunicationBadge state={request.callerCommunication.state} />
         </div>
       </div>
 
@@ -69,7 +122,7 @@ export function RequestDetail({ requestId }: { requestId: string }) {
                 <p className="card-kicker">Caller need</p>
                 <h2 id="need-title">What the caller is asking for</h2>
               </div>
-              <span className="priority-pill">{request.priority === "urgent" ? "Urgent request" : "Standard request"}</span>
+              <span className={request.priority === "urgent" ? "priority-pill priority-pill--same-day" : "priority-pill"}>{request.priority === "urgent" ? "Same-day response" : "Standard response"}</span>
             </div>
             <p className="detail-summary">The caller wants to know whether the relevant service is available before traveling to the facility. The voice agent has captured the request, but the operational answer still needs a staff check.</p>
             <div className="detail-facts">
@@ -80,6 +133,37 @@ export function RequestDetail({ requestId }: { requestId: string }) {
             </div>
           </section>
 
+          <section className="content-card workflow-card" aria-labelledby="handoff-title">
+            <div className="section-heading">
+              <div>
+                <p className="card-kicker">Workflow handoff</p>
+                <h2 id="handoff-title">Who owns the next update?</h2>
+              </div>
+              <CommunicationBadge state={request.callerCommunication.state} />
+            </div>
+            <p className="workflow-summary">{request.nextAction.summary}</p>
+            <div className="workflow-facts">
+              <div><span className="field-label">Next owner</span><strong>{request.nextAction.owner || request.assignedTo || "Not assigned"}</strong></div>
+              <div><span className="field-label">Promised update</span><strong>{request.nextAction.dueAt || "Not set"}</strong></div>
+            </div>
+
+            {request.callerCommunication.state === "communicated" ? (
+              <div className="callout callout--success workflow-callout">
+                {request.callerCommunication.recordedBy || "Staff"} recorded a {followUpMethodLabel(request.callerCommunication.method)} as complete{request.callerCommunication.recordedAt ? ` on ${request.callerCommunication.recordedAt}` : ""}.
+              </div>
+            ) : canRecordCallerFollowUp ? (
+              <div className="workflow-actions">
+                <button className="button button--primary" type="button" onClick={() => { recordCallerFollowUp(request.id, "voice_follow_up"); notify("Voice follow-up recorded as complete."); }}>Record voice follow-up complete</button>
+                <button className="button button--secondary" type="button" onClick={() => { recordCallerFollowUp(request.id, "callback"); notify("Callback recorded as complete."); }}>Record callback complete</button>
+                <p className="demo-label">These buttons only record staff-reported follow-up; they do not call or message the caller.</p>
+              </div>
+            ) : (
+              <div className="callout callout--neutral workflow-callout">
+                A caller update is not ready to record yet. Verify the facility fact, or flag the need for clarification, before recording follow-up.
+              </div>
+            )}
+          </section>
+
           <section className="content-card" aria-labelledby="verification-title">
             <div className="section-heading">
               <div>
@@ -88,16 +172,35 @@ export function RequestDetail({ requestId }: { requestId: string }) {
               </div>
               <VerificationBadge state={request.verification.state} />
             </div>
-            <div className="verification-panel">
-              <div className="verification-panel__icon" aria-hidden="true">✓</div>
+            <div className={`verification-panel${request.verification.state === "verified" ? "" : " verification-panel--warning"}`}>
+              <div className="verification-panel__icon" aria-hidden="true">{request.verification.state === "verified" ? "✓" : "!"}</div>
               <div>
                 <strong>{request.verification.state === "verified" ? "Staff-confirmed information" : "Staff confirmation is still needed"}</strong>
                 <p>{request.verification.lastVerifiedAt ? `Last checked by ${request.verification.verifiedBy} on ${request.verification.lastVerifiedAt}.` : "No staff verification has been recorded for this request yet."}</p>
               </div>
             </div>
+            <div className="evidence-facts">
+              <div><span className="field-label">Evidence source</span><strong>{request.verification.source || "No source recorded"}</strong></div>
+              <div><span className="field-label">Checked at</span><strong>{request.verification.lastVerifiedAt || "Not checked"}</strong></div>
+              <div><span className="field-label">Fresh until</span><strong>{request.verification.expiresAt || "No expiry recorded"}</strong></div>
+            </div>
             <div className="callout callout--warning">
               Do not promise availability, an appointment, or emergency support until an authorized staff member confirms the relevant fact.
             </div>
+          </section>
+
+          <section className="content-card journey-card" aria-labelledby="journey-title">
+            <div className="section-heading">
+              <div>
+                <p className="card-kicker">Caller-provided journey context</p>
+                <h2 id="journey-title">What would make the journey worthwhile?</h2>
+              </div>
+            </div>
+            <div className="journey-grid">
+              <div><span className="field-label">Travel context</span><strong>{request.journeyContext?.travelPlan || "No travel context recorded"}</strong></div>
+              <div><span className="field-label">Access constraint</span><strong>{request.journeyContext?.accessConstraint || "No access constraint recorded"}</strong></div>
+            </div>
+            <div className="callout callout--neutral">This is caller-reported access context, not a clinical-triage signal.</div>
           </section>
 
           <section className="content-card" aria-labelledby="timeline-title">
@@ -124,21 +227,47 @@ export function RequestDetail({ requestId }: { requestId: string }) {
             <h2 id="action-title">{actionHeading}</h2>
             <p>Keep the next step explicit. Demo actions update the local queue and append an audit event.</p>
 
-            {request.status === "new" && (
-              <button className="button button--secondary button--full" type="button" onClick={() => { setRequestStatus(request.id, "in_review", "Review started"); notify("Request moved into review."); }}>Start review</button>
-            )}
-            {request.status !== "resolved" && request.status !== "confirmed" && request.status !== "rejected" && (
+            {reasonAction ? (
+              <form className="reason-form" onSubmit={handleReasonSubmit}>
+                <label className="field-label" htmlFor={`reason-${request.id}`}>
+                  {reasonAction === "reject" ? "Why is this unavailable?" : "Why does this need escalation?"}
+                </label>
+                <textarea
+                  id={`reason-${request.id}`}
+                  value={reasonDraft}
+                  onChange={(event) => setReasonDraft(event.target.value)}
+                  placeholder={reasonAction === "reject" ? "Record the verified availability constraint." : "Record what requires supervisor review."}
+                  rows={4}
+                  autoFocus
+                />
+                <div className="reason-form__actions">
+                  <button className="button button--secondary" type="button" onClick={() => { setReasonAction(null); setReasonDraft(""); }}>Cancel</button>
+                  <button className="button button--primary" type="submit" disabled={!reasonDraft.trim()}>{reasonAction === "reject" ? "Confirm unavailable" : "Confirm escalation"}</button>
+                </div>
+              </form>
+            ) : (
               <>
-                <button className="button button--primary button--full" type="button" onClick={() => { confirmRequest(request.id); notify("Information confirmed."); }}>Confirm information</button>
-                <button className="button button--secondary button--full" type="button" onClick={() => { rejectRequest(request.id); notify("Availability marked unavailable."); }}>Mark unavailable</button>
-                <button className="button button--secondary button--full" type="button" onClick={() => { setRequestStatus(request.id, "awaiting_clarification", "Clarification requested"); notify("Clarification requested."); }}>Request clarification</button>
-                <button className="button button--quiet button--full" type="button" onClick={() => { setRequestStatus(request.id, "escalated", "Escalated to supervisor"); notify("Request escalated to a supervisor."); }}>Escalate to supervisor</button>
+                {request.status === "new" && (
+                  <button className="button button--secondary button--full" type="button" onClick={() => { setRequestStatus(request.id, "in_review", "Review started"); notify("Request moved into review."); }}>Start review</button>
+                )}
+                {canChooseOutcome && (
+                  <>
+                    <button className="button button--primary button--full" type="button" onClick={() => { confirmRequest(request.id); notify("Information confirmed and ready for caller follow-up."); }}>Confirm information</button>
+                    <button className="button button--secondary button--full" type="button" onClick={() => startReasonAction("reject")}>Mark unavailable</button>
+                    {request.status !== "awaiting_clarification" && <button className="button button--secondary button--full" type="button" onClick={() => { flagClarification(request.id); notify("Clarification flagged for a staff caller follow-up."); }}>Flag clarification for follow-up</button>}
+                    {request.status !== "escalated" && <button className="button button--quiet button--full" type="button" onClick={() => startReasonAction("escalate")}>Escalate to supervisor</button>}
+                  </>
+                )}
+                {showResolutionAction && (
+                  request.callerCommunication.state === "communicated" ? (
+                    <button className="button button--primary button--full" type="button" onClick={() => { setRequestStatus(request.id, "resolved", "Request resolved after caller follow-up"); notify("Request marked resolved."); }}>Mark request resolved</button>
+                  ) : (
+                    <div className="callout callout--warning">Record the caller follow-up before closing this request. Recording it here does not send a message.</div>
+                  )
+                )}
+                {request.status === "resolved" && <div className="callout callout--success">This request has a recorded outcome and is closed in the demo queue.</div>}
               </>
             )}
-            {showResolutionAction && (
-              <button className="button button--primary button--full" type="button" onClick={() => { setRequestStatus(request.id, "resolved", "Request resolved"); notify("Request marked resolved."); }}>Mark request resolved</button>
-            )}
-            {request.status === "resolved" && <div className="callout callout--success">This request has a recorded outcome and is closed in the demo queue.</div>}
             <Link className="text-button text-button--link" href="/dashboard/facility">Correct facility information →</Link>
           </section>
 
@@ -153,7 +282,7 @@ export function RequestDetail({ requestId }: { requestId: string }) {
               <option value="Grace N.">Grace N.</option>
               <option value="Peter L.">Peter L.</option>
             </select>
-            <p className="demo-label">Assignment changes are local until the agent API is connected.</p>
+            <p className="demo-label">The selected staff member becomes the next owner in this local demo.</p>
           </section>
 
           <section className="content-card note-card" aria-labelledby="notes-title">

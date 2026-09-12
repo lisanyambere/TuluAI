@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
-import type { RequestStatus, TuluRequest } from "@tulu/shared";
+import type { CallerCommunicationMethod, RequestStatus, TuluRequest } from "@tulu/shared";
 import type { FacilityProfile } from "@/lib/mock-data";
 
 type DashboardDataContextValue = {
@@ -9,7 +9,10 @@ type DashboardDataContextValue = {
   facility: FacilityProfile;
   setRequestStatus: (id: string, status: RequestStatus, action: string) => void;
   confirmRequest: (id: string) => void;
-  rejectRequest: (id: string) => void;
+  rejectRequest: (id: string, reason: string) => void;
+  escalateRequest: (id: string, reason: string) => void;
+  flagClarification: (id: string) => void;
+  recordCallerFollowUp: (id: string, method: CallerCommunicationMethod) => void;
   assignRequest: (id: string, assignee: string | undefined) => void;
   addNote: (id: string, body: string) => void;
   updateFacility: (updates: Partial<FacilityProfile>) => void;
@@ -18,6 +21,7 @@ type DashboardDataContextValue = {
 const DashboardDataContext = createContext<DashboardDataContextValue | null>(null);
 
 const DEMO_ACTOR = "Grace N. (demo)";
+const DEMO_SUPERVISOR = "Grace N.";
 
 function eventTime() {
   return new Intl.DateTimeFormat("en-KE", {
@@ -43,7 +47,7 @@ export function DashboardDataProvider({
   const setRequestStatus = useCallback((id: string, status: RequestStatus, action: string) => {
     setRequests((current) =>
       current.map((request) =>
-        request.id !== id
+        request.id !== id || (status === "resolved" && request.callerCommunication.state !== "communicated")
           ? request
           : {
               ...request,
@@ -58,6 +62,8 @@ export function DashboardDataProvider({
   }, []);
 
   const confirmRequest = useCallback((id: string) => {
+    const createdAt = eventTime();
+
     setRequests((current) =>
       current.map((request) =>
         request.id !== id
@@ -67,19 +73,37 @@ export function DashboardDataProvider({
               status: "confirmed",
               verification: {
                 state: "verified",
-                lastVerifiedAt: eventTime(),
+                lastVerifiedAt: createdAt,
                 verifiedBy: DEMO_ACTOR,
+                source: "Facility staff confirmation (demo)",
+                expiresAt: "End of current shift",
+              },
+              callerCommunication: { state: "ready_to_communicate" },
+              nextAction: {
+                summary: "Record a staff-confirmed caller follow-up",
+                owner: request.assignedTo || request.nextAction.owner,
+                dueAt: request.nextAction.dueAt,
               },
               auditEvents: [
                 ...request.auditEvents,
-                { id: `${id}-${Date.now()}`, actor: DEMO_ACTOR, action: "Information confirmed", createdAt: eventTime() },
+                {
+                  id: `${id}-${Date.now()}`,
+                  actor: DEMO_ACTOR,
+                  action: "Information confirmed; caller follow-up is ready",
+                  createdAt,
+                },
               ],
             },
       ),
     );
   }, []);
 
-  const rejectRequest = useCallback((id: string) => {
+  const rejectRequest = useCallback((id: string, reason: string) => {
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) return;
+
+    const createdAt = eventTime();
+
     setRequests((current) =>
       current.map((request) =>
         request.id !== id
@@ -89,12 +113,124 @@ export function DashboardDataProvider({
               status: "rejected",
               verification: {
                 state: "verified",
-                lastVerifiedAt: eventTime(),
+                lastVerifiedAt: createdAt,
                 verifiedBy: DEMO_ACTOR,
+                source: "Facility staff confirmation (demo)",
+                expiresAt: "End of current shift",
+              },
+              callerCommunication: { state: "ready_to_communicate" },
+              nextAction: {
+                summary: "Record a caller follow-up about the unavailable service",
+                owner: request.assignedTo || request.nextAction.owner,
+                dueAt: request.nextAction.dueAt,
               },
               auditEvents: [
                 ...request.auditEvents,
-                { id: `${id}-${Date.now()}`, actor: DEMO_ACTOR, action: "Availability marked unavailable", createdAt: eventTime() },
+                {
+                  id: `${id}-${Date.now()}`,
+                  actor: DEMO_ACTOR,
+                  action: `Availability marked unavailable — ${trimmedReason}`,
+                  createdAt,
+                },
+              ],
+            },
+      ),
+    );
+  }, []);
+
+  const escalateRequest = useCallback((id: string, reason: string) => {
+    const trimmedReason = reason.trim();
+    if (!trimmedReason) return;
+
+    const createdAt = eventTime();
+
+    setRequests((current) =>
+      current.map((request) =>
+        request.id !== id
+          ? request
+          : {
+              ...request,
+              status: "escalated",
+              assignedTo: DEMO_SUPERVISOR,
+              callerCommunication: { state: "follow_up_due" },
+              nextAction: {
+                summary: "Supervisor review and a safe caller update",
+                owner: DEMO_SUPERVISOR,
+                dueAt: request.nextAction.dueAt || "Before the end of the current shift",
+              },
+              auditEvents: [
+                ...request.auditEvents,
+                {
+                  id: `${id}-${Date.now()}`,
+                  actor: DEMO_ACTOR,
+                  action: `Escalated to supervisor — ${trimmedReason}`,
+                  createdAt,
+                },
+              ],
+            },
+      ),
+    );
+  }, []);
+
+  const flagClarification = useCallback((id: string) => {
+    const createdAt = eventTime();
+
+    setRequests((current) =>
+      current.map((request) =>
+        request.id !== id
+          ? request
+          : {
+              ...request,
+              status: "awaiting_clarification",
+              callerCommunication: { state: "follow_up_due" },
+              nextAction: {
+                summary: "Clarify the request during a staff follow-up",
+                owner: request.assignedTo || request.nextAction.owner,
+                dueAt: request.nextAction.dueAt,
+              },
+              auditEvents: [
+                ...request.auditEvents,
+                {
+                  id: `${id}-${Date.now()}`,
+                  actor: DEMO_ACTOR,
+                  action: "Clarification flagged for caller follow-up",
+                  createdAt,
+                },
+              ],
+            },
+      ),
+    );
+  }, []);
+
+  const recordCallerFollowUp = useCallback((id: string, method: CallerCommunicationMethod) => {
+    const createdAt = eventTime();
+    const methodLabel = method === "voice_follow_up" ? "voice follow-up" : "callback";
+
+    setRequests((current) =>
+      current.map((request) =>
+        request.id !== id
+          ? request
+          : {
+              ...request,
+              callerCommunication: {
+                state: "communicated",
+                method,
+                recordedAt: createdAt,
+                recordedBy: DEMO_ACTOR,
+              },
+              nextAction: {
+                ...request.nextAction,
+                summary: "Record the outcome",
+                owner: request.assignedTo || request.nextAction.owner,
+              },
+              auditEvents: [
+                ...request.auditEvents,
+                {
+                  id: `${id}-${Date.now()}`,
+                  actor: DEMO_ACTOR,
+                  action: `Caller ${methodLabel} recorded as complete`,
+                  createdAt,
+                },
               ],
             },
       ),
@@ -109,6 +245,7 @@ export function DashboardDataProvider({
           : {
               ...request,
               assignedTo: assignee,
+              nextAction: { ...request.nextAction, owner: assignee },
               auditEvents: [
                 ...request.auditEvents,
                 {
@@ -151,8 +288,32 @@ export function DashboardDataProvider({
   }, []);
 
   const value = useMemo(
-    () => ({ requests, facility, setRequestStatus, confirmRequest, rejectRequest, assignRequest, addNote, updateFacility }),
-    [requests, facility, setRequestStatus, confirmRequest, rejectRequest, assignRequest, addNote, updateFacility],
+    () => ({
+      requests,
+      facility,
+      setRequestStatus,
+      confirmRequest,
+      rejectRequest,
+      escalateRequest,
+      flagClarification,
+      recordCallerFollowUp,
+      assignRequest,
+      addNote,
+      updateFacility,
+    }),
+    [
+      requests,
+      facility,
+      setRequestStatus,
+      confirmRequest,
+      rejectRequest,
+      escalateRequest,
+      flagClarification,
+      recordCallerFollowUp,
+      assignRequest,
+      addNote,
+      updateFacility,
+    ],
   );
 
   return <DashboardDataContext.Provider value={value}>{children}</DashboardDataContext.Provider>;

@@ -23,6 +23,25 @@ export type VerificationState =
   | "verified"
   | "stale";
 
+export type CallerCommunicationState =
+  | "not_ready"
+  | "ready_to_communicate"
+  | "follow_up_due"
+  | "communicated";
+
+export type CallerCommunicationMethod = "voice_follow_up" | "callback";
+
+export type RequestNextAction = {
+  summary: string;
+  owner?: string;
+  dueAt?: string;
+};
+
+export type JourneyContext = {
+  travelPlan?: string;
+  accessConstraint?: string;
+};
+
 export type RequestNote = {
   id: string;
   author: string;
@@ -53,7 +72,17 @@ export type TuluRequest = {
     state: VerificationState;
     lastVerifiedAt?: string;
     verifiedBy?: string;
+    source?: string;
+    expiresAt?: string;
   };
+  callerCommunication: {
+    state: CallerCommunicationState;
+    recordedAt?: string;
+    recordedBy?: string;
+    method?: CallerCommunicationMethod;
+  };
+  nextAction: RequestNextAction;
+  journeyContext?: JourneyContext;
   notes: RequestNote[];
   auditEvents: AuditEvent[];
 };

@@ -1,4 +1,9 @@
-import { REQUEST_STATUS_LABELS, type RequestStatus, type VerificationState } from "@tulu/shared";
+import {
+  REQUEST_STATUS_LABELS,
+  type CallerCommunicationState,
+  type RequestStatus,
+  type VerificationState,
+} from "@tulu/shared";
 
 const statusClass: Record<RequestStatus, string> = {
   new: "status-badge--new",
@@ -18,10 +23,21 @@ const verificationLabels: Record<VerificationState, string> = {
   stale: "Needs re-check",
 };
 
+const communicationLabels: Record<CallerCommunicationState, string> = {
+  not_ready: "Caller update not ready",
+  ready_to_communicate: "Ready for caller update",
+  follow_up_due: "Caller follow-up due",
+  communicated: "Caller follow-up recorded",
+};
+
 export function StatusBadge({ status }: { status: RequestStatus }) {
   return <span className={`status-badge ${statusClass[status]}`}>{REQUEST_STATUS_LABELS[status]}</span>;
 }
 
 export function VerificationBadge({ state }: { state: VerificationState }) {
   return <span className={`verification-badge verification-badge--${state}`}>{verificationLabels[state]}</span>;
+}
+
+export function CommunicationBadge({ state }: { state: CallerCommunicationState }) {
+  return <span className={`communication-badge communication-badge--${state}`}>{communicationLabels[state]}</span>;
 }

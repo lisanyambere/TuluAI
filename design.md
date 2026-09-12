@@ -33,7 +33,7 @@ Requests that require staff judgment should be presented as normal, responsible 
 
 ### Calm urgency
 
-Prioritize requests using clear, explainable signals such as age, stated urgency, and information freshness. Avoid alarm-heavy visuals or artificial countdowns.
+Prioritize requests using clear, explainable signals such as time waiting, caller-reported timing needs, and information freshness. Avoid alarm-heavy visuals or artificial countdowns.
 
 ### Safe defaults and deliberate high-impact actions
 
@@ -124,6 +124,19 @@ The proposed initial statuses are:
 
 Statuses should be defined in `packages/shared` so the caller, dashboard, and future agent API use the same vocabulary.
 
+### Caller communication state
+
+Caller communication is a separate operational record from verification. A verified facility fact does not mean the caller has received it, and recording a follow-up does not mean an automated delivery system sent a message.
+
+| State | Meaning |
+| --- | --- |
+| `not_ready` | Staff do not yet have a safe answer or next step to record for the caller |
+| `ready_to_communicate` | A staff-confirmed answer is ready; no caller follow-up has been recorded yet |
+| `follow_up_due` | Clarification or a supervisor decision needs a staff follow-up |
+| `communicated` | A staff member explicitly recorded a completed voice follow-up or callback |
+
+The dashboard must display the next owner, the planned update time, and the communication state together. It must never present a recorded follow-up as proof that the caller received or understood it.
+
 ## 6. Information architecture
 
 Initial routes:
@@ -161,9 +174,12 @@ The visual tone should feel dependable, humane, and operational—not like a gen
 ## 8. Behavioral design patterns
 
 - Show the last verified time and verifying staff member wherever freshness matters.
+- Show the evidence source and an explicit freshness expiry alongside a verification state.
 - Give each request one primary next action rather than presenting a wall of equal buttons.
 - Use truthful progress counts such as requests awaiting verification or resolved today.
 - Make ownership visible to reduce ambiguity.
+- Keep caller-provided travel or access context distinct from clinical triage or priority rules.
+- Require a written reason before recording an unavailable result or an escalation.
 - Preserve uncertainty instead of forcing a premature yes/no answer.
 - Use short factual context about the caller's need, without inventing emotional details.
 - Never use fabricated scarcity, social proof, or urgency to pressure staff into unsafe decisions.
@@ -188,6 +204,23 @@ type Request = {
     state: "unverified" | "partially_verified" | "verified" | "stale";
     lastVerifiedAt?: string;
     verifiedBy?: string;
+    source?: string;
+    expiresAt?: string;
+  };
+  callerCommunication: {
+    state: "not_ready" | "ready_to_communicate" | "follow_up_due" | "communicated";
+    method?: "voice_follow_up" | "callback";
+    recordedAt?: string;
+    recordedBy?: string;
+  };
+  nextAction: {
+    summary: string;
+    owner?: string;
+    dueAt?: string;
+  };
+  journeyContext?: {
+    travelPlan?: string;
+    accessConstraint?: string;
   };
   notes: Note[];
   auditEvents: AuditEvent[];

@@ -15,6 +15,8 @@ pnpm dev:dash
 
 The dashboard currently uses a synthetic demo staff session and local request/facility data. Auth0 setup is documented in `.env.example` for the later integration step; credentials must never be committed.
 
+The local workflow pass keeps verification and caller communication separate. It surfaces the evidence source and expiry, next owner and planned update, caller-provided travel context, and a required reason for unavailable or escalated decisions. Recording a follow-up only records a staff action in the browser; it does not place a call or send a message.
+
 The upstream `services/agent-api` currently provides the GPT-Live WebRTC session foundation only. It does not yet expose facility lookup, inventory, request persistence, or staff actions, so the dashboard keeps those workflows behind a local data provider until those contracts exist.
 
 When implemented, `apps/main-dash` can be configured as its own hosting project and deployment root.

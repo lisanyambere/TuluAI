@@ -33,7 +33,23 @@ export const MOCK_REQUESTS: TuluRequest[] = [
     facilityId: "maralal-chc",
     facilityName: "Maralal Community Health Centre",
     assignedTo: "Grace N.",
-    verification: { state: "stale", lastVerifiedAt: "11 Sep 2026 · 16:10", verifiedBy: "Joseph K." },
+    verification: {
+      state: "stale",
+      lastVerifiedAt: "11 Sep 2026 · 16:10",
+      verifiedBy: "Joseph K.",
+      source: "Maternity duty roster",
+      expiresAt: "12 Sep 2026 · 08:00",
+    },
+    callerCommunication: { state: "not_ready" },
+    nextAction: {
+      summary: "Confirm maternity desk coverage before the caller travels",
+      owner: "Grace N.",
+      dueAt: "12 Sep · 10:30",
+    },
+    journeyContext: {
+      travelPlan: "Caller reported planning a same-day trip from outside Maralal.",
+      accessConstraint: "They asked for confirmation before arranging transport.",
+    },
     notes: [{ id: "n-1042-1", author: "Grace N.", body: "Waiting for the maternity desk to confirm today's coverage.", createdAt: "12 Sep · 08:48" }],
     auditEvents: [
       { id: "a-1042-1", actor: "Tulu voice agent", action: "Request received", createdAt: "12 Sep · 08:36" },
@@ -53,6 +69,16 @@ export const MOCK_REQUESTS: TuluRequest[] = [
     facilityName: "Maralal Community Health Centre",
     assignedTo: "You",
     verification: { state: "unverified" },
+    callerCommunication: { state: "not_ready" },
+    nextAction: {
+      summary: "Check laboratory availability for this afternoon",
+      owner: "You",
+      dueAt: "12 Sep · 10:45",
+    },
+    journeyContext: {
+      travelPlan: "Caller asked before setting out this afternoon.",
+      accessConstraint: "No transport or appointment details were recorded.",
+    },
     notes: [],
     auditEvents: [{ id: "a-1041-1", actor: "Tulu voice agent", action: "Request received", createdAt: "12 Sep · 08:11" }],
   },
@@ -68,7 +94,22 @@ export const MOCK_REQUESTS: TuluRequest[] = [
     facilityId: "maralal-chc",
     facilityName: "Maralal Community Health Centre",
     assignedTo: "You",
-    verification: { state: "partially_verified", lastVerifiedAt: "12 Sep 2026 · 07:35", verifiedBy: "Grace N." },
+    verification: {
+      state: "partially_verified",
+      lastVerifiedAt: "12 Sep 2026 · 07:35",
+      verifiedBy: "Grace N.",
+      source: "Morning duty roster",
+      expiresAt: "12 Sep 2026 · 11:00",
+    },
+    callerCommunication: { state: "not_ready" },
+    nextAction: {
+      summary: "Confirm the duty roster with the clinic lead",
+      owner: "You",
+      dueAt: "12 Sep · 10:20",
+    },
+    journeyContext: {
+      travelPlan: "Caller wants to avoid arriving when the relevant staff member is unavailable.",
+    },
     notes: [{ id: "n-1040-1", author: "You", body: "Checking the duty roster before responding.", createdAt: "12 Sep · 08:02" }],
     auditEvents: [
       { id: "a-1040-1", actor: "Tulu voice agent", action: "Request received", createdAt: "12 Sep · 07:26" },
@@ -86,9 +127,19 @@ export const MOCK_REQUESTS: TuluRequest[] = [
     callerReference: "Caller · Kiswahili",
     facilityId: "maralal-chc",
     facilityName: "Maralal Community Health Centre",
+    assignedTo: "Peter L.",
     verification: { state: "unverified" },
+    callerCommunication: { state: "follow_up_due" },
+    nextAction: {
+      summary: "Clarify the service need during a staff follow-up",
+      owner: "Peter L.",
+      dueAt: "12 Sep · 10:15",
+    },
+    journeyContext: {
+      accessConstraint: "Caller needs a plain-language explanation of which service desk to use.",
+    },
     notes: [{ id: "n-1039-1", author: "Peter L.", body: "The caller needs to clarify whether this is a routine or urgent visit.", createdAt: "12 Sep · 07:55" }],
-    auditEvents: [{ id: "a-1039-1", actor: "Peter L.", action: "Clarification requested", createdAt: "12 Sep · 07:55" }],
+    auditEvents: [{ id: "a-1039-1", actor: "Peter L.", action: "Clarification flagged for caller follow-up", createdAt: "12 Sep · 07:55" }],
   },
   {
     id: "TUL-1038",
@@ -102,7 +153,23 @@ export const MOCK_REQUESTS: TuluRequest[] = [
     facilityId: "maralal-chc",
     facilityName: "Maralal Community Health Centre",
     assignedTo: "Grace N.",
-    verification: { state: "stale", lastVerifiedAt: "10 Sep 2026 · 14:20", verifiedBy: "Joseph K." },
+    verification: {
+      state: "stale",
+      lastVerifiedAt: "10 Sep 2026 · 14:20",
+      verifiedBy: "Joseph K.",
+      source: "Stock record",
+      expiresAt: "11 Sep 2026 · 14:20",
+    },
+    callerCommunication: { state: "follow_up_due" },
+    nextAction: {
+      summary: "Supervisor to verify stock and prepare a safe caller update",
+      owner: "Grace N.",
+      dueAt: "12 Sep · 10:00",
+    },
+    journeyContext: {
+      travelPlan: "Caller asked before making a journey to collect medicine.",
+      accessConstraint: "A confirmed answer could prevent an unsuccessful trip.",
+    },
     notes: [{ id: "n-1038-1", author: "Grace N.", body: "Escalated because stock information is older than the freshness threshold.", createdAt: "12 Sep · 07:44" }],
     auditEvents: [
       { id: "a-1038-1", actor: "Tulu voice agent", action: "Request received", createdAt: "12 Sep · 05:58" },
@@ -121,7 +188,26 @@ export const MOCK_REQUESTS: TuluRequest[] = [
     facilityId: "maralal-chc",
     facilityName: "Maralal Community Health Centre",
     assignedTo: "Peter L.",
-    verification: { state: "verified", lastVerifiedAt: "12 Sep 2026 · 06:52", verifiedBy: "Peter L." },
+    verification: {
+      state: "verified",
+      lastVerifiedAt: "12 Sep 2026 · 06:52",
+      verifiedBy: "Peter L.",
+      source: "Facility opening-hours record",
+      expiresAt: "12 Sep 2026 · 17:00",
+    },
+    callerCommunication: {
+      state: "communicated",
+      recordedAt: "12 Sep · 06:55",
+      recordedBy: "Peter L.",
+      method: "voice_follow_up",
+    },
+    nextAction: {
+      summary: "Outcome recorded",
+      owner: "Peter L.",
+    },
+    journeyContext: {
+      travelPlan: "Caller wanted to plan a routine outpatient visit.",
+    },
     notes: [],
     auditEvents: [
       { id: "a-1037-1", actor: "Tulu voice agent", action: "Request received", createdAt: "12 Sep · 04:18" },

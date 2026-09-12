@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { StatusBadge, VerificationBadge } from "@/components/status-badge";
+import { CommunicationBadge, StatusBadge, VerificationBadge } from "@/components/status-badge";
 import { useDashboardData } from "@/components/dashboard-data-provider";
 import type { TuluRequest } from "@tulu/shared";
 
@@ -18,15 +18,7 @@ function formatReceivedAt(value: string) {
 }
 
 function getNextAction(request: TuluRequest) {
-  if (request.status === "new") return "Start review";
-  if (request.status === "in_review") return "Continue review";
-  if (request.status === "needs_verification") return "Verify information";
-  if (request.status === "awaiting_clarification") return "Request clarification";
-  if (request.status === "escalated") return "Review handoff";
-  if (request.status === "confirmed") return "Record outcome";
-  if (request.status === "rejected") return "Record outcome";
-  if (request.status === "resolved") return "View outcome";
-  return "Open request";
+  return request.nextAction.summary;
 }
 
 export function RequestQueue() {
@@ -67,7 +59,7 @@ export function RequestQueue() {
         </div>
         <div className="header-signal">
           <span className="pulse-dot" aria-hidden="true" />
-          <span>Live request workspace</span>
+          <span>Local demo workspace</span>
         </div>
       </div>
 
@@ -83,9 +75,9 @@ export function RequestQueue() {
           <span className="metric-card__note">Information needs a staff check</span>
         </div>
         <div className="metric-card">
-          <span className="metric-card__label">Urgent requests</span>
+          <span className="metric-card__label">Needs same-day response</span>
           <strong>{urgentCount}</strong>
-          <span className="metric-card__note">Marked urgent by the caller flow</span>
+          <span className="metric-card__note">Caller-reported time sensitivity</span>
         </div>
         <div className="metric-card metric-card--quiet">
           <span className="metric-card__label">Resolved today</span>
@@ -116,7 +108,7 @@ export function RequestQueue() {
           <div className="filter-tabs" role="group" aria-label="Filter requests">
             <button className={filter === "all" ? "filter-tab filter-tab--active" : "filter-tab"} onClick={() => setFilter("all")} type="button">All</button>
             <button className={filter === "needs_verification" ? "filter-tab filter-tab--active" : "filter-tab"} onClick={() => setFilter("needs_verification")} type="button">Needs review</button>
-            <button className={filter === "urgent" ? "filter-tab filter-tab--active" : "filter-tab"} onClick={() => setFilter("urgent")} type="button">Urgent</button>
+            <button className={filter === "urgent" ? "filter-tab filter-tab--active" : "filter-tab"} onClick={() => setFilter("urgent")} type="button">Same-day</button>
             <button className={filter === "assigned" ? "filter-tab filter-tab--active" : "filter-tab"} onClick={() => setFilter("assigned")} type="button">Assigned</button>
           </div>
         </div>
@@ -128,7 +120,7 @@ export function RequestQueue() {
                 <div className="request-row__meta">
                   <span className="request-id">{request.id}</span>
                   <span className={request.priority === "urgent" ? "priority-label priority-label--urgent" : "priority-label"}>
-                    {request.priority === "urgent" ? "Urgent" : "Standard"}
+                    {request.priority === "urgent" ? "Same-day" : "Standard"}
                   </span>
                   <span>{formatReceivedAt(request.receivedAt)}</span>
                 </div>
@@ -138,9 +130,13 @@ export function RequestQueue() {
               <div className="request-row__status">
                 <StatusBadge status={request.status} />
                 <VerificationBadge state={request.verification.state} />
+                <CommunicationBadge state={request.callerCommunication.state} />
               </div>
               <div className="request-row__action">
-                <span>{getNextAction(request)}</span>
+                <div>
+                  <strong>{getNextAction(request)}</strong>
+                  <small>Next owner: {request.nextAction.owner || request.assignedTo || "Not assigned"}{request.nextAction.dueAt ? ` · Update by ${request.nextAction.dueAt}` : ""}</small>
+                </div>
                 <span aria-hidden="true">→</span>
               </div>
             </Link>
