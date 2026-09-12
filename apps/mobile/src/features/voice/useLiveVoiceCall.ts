@@ -67,14 +67,14 @@ function openingInstructions(language: LiveVoiceLanguage) {
   if (language === "sw") {
     return [
       "Speak first, in clear and natural Kiswahili.",
-      "Begin with this complete disclosure: Habari, mimi ni Tulu, msaidizi wa majaribio wa akili bandia—si daktari wala huduma ya dharura. Simu hii inatumia maikrofoni yako. Ninaweza kueleza jinsi Tulu itakavyosaidia kukagua taarifa za kituo cha afya, lakini mfumo huu wa majaribio haujaunganishwa na kituo chochote bado. Ikiwa mtu yuko katika hatari ya haraka, wasiliana na huduma za dharura za eneo lako sasa na usingoje kwenye simu hii. Ninaweza kukusaidiaje leo?",
+      "Begin with this complete disclosure: Habari, mimi ni Tulu, msaidizi wa akili bandia wa kupata huduma za kliniki. Mimi si daktari wala huduma ya dharura. Ikiwa mtu yuko katika hatari ya haraka, wasiliana na huduma za dharura za eneo lako sasa. Ninaweza kukusaidiaje leo?",
       "After speaking the disclosure, stop and listen for the caller. Ask one short question at a time.",
     ].join(" ");
   }
 
   return [
     "Speak first, in clear and natural English.",
-    "Begin with this complete disclosure: Hello, I’m Tulu, an AI demonstration assistant—not a doctor or emergency service. This call uses your microphone. I can explain how Tulu will help check facility information, but this demonstration is not connected to a health facility yet. If someone is in immediate danger, contact local emergency services now and do not wait on this call. How can I help you today?",
+    "Begin with this complete disclosure: Hello, I’m Tulu, an AI clinic access assistant. I’m not a doctor or emergency service. If someone is in immediate danger, contact local emergency services now. How can I help you today?",
     "After speaking the disclosure, stop and listen for the caller. Ask one short question at a time.",
   ].join(" ");
 }
