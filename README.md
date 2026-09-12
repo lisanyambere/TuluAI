@@ -4,7 +4,7 @@ Tulu is a voice-led healthcare-access project for communities where making a pho
 
 The long-term product lets someone call a Tulu access line from an ordinary mobile phone, speak naturally in a supported local language, and ask practical questions before making a long journey to a health facility. Tulu can then coordinate with verified facility information and authorized staff through a separate operations dashboard.
 
-> **Current status:** this repository now contains a working browser-to-OpenAI voice vertical slice. After explicit consent, the caller experience captures microphone audio and establishes a full-duplex WebRTC session with `gpt-live-1`; a trusted Node.js API keeps the OpenAI key server-side, constructs the prompts, and configures Responses delegation to `gpt-5.6-terra`. This is still a controlled demo: it does not place or receive a PSTN/mobile-network call, connect to a facility, read medicine or clinician availability, perform state-changing actions, create a real healthcare request, or provide a finished facility dashboard.
+> **Current status:** this repository contains a working browser-to-OpenAI voice vertical slice and, on the `dash` branch, a facility-dashboard workflow prototype. The voice experience and trusted Node.js API remain controlled demos; the dashboard uses synthetic local data until the agent API exposes facility tools, persistence, and authenticated staff operations.
 
 ## Why Tulu exists
 
@@ -26,9 +26,9 @@ Tulu is separated into three independently deployable product surfaces plus a sh
 | Surface | Audience | Responsibility | Status |
 | --- | --- | --- | --- |
 | Mobile caller experience | Members of the public and hackathon judges | Simulates dialing a Tulu number and runs the real browser voice session | Working voice MVP |
-| Facility dashboard | Authorized facility teams | Reviews requests, updates operational information, confirms outcomes, and coordinates human follow-up | Workspace reserved; not implemented |
+| Facility dashboard | Facility teams | Reviews requests, updates operational information, confirms outcomes, and coordinates human follow-up | Workflow prototype on `dash`; synthetic data only |
 | Agent API | Trusted server-side infrastructure | Validates session requests, keeps the OpenAI key private, constructs prompts, and creates GPT-Live sessions | Working session gateway and prompt layer; no tools or persistence |
-| Shared contracts | Mobile and Agent API | Defines the validated Live-session request, response, language, and error contracts | Implemented for the voice handshake |
+| Shared contracts | Mobile, dashboard, and Agent API | Defines the validated Live-session contracts plus the dashboard request/status model | Voice handshake and local dashboard workflow types implemented |
 
 The `mobile` application is a responsive web experience rather than a native Android or iOS application. It can be opened on phones and desktop browsers. Today it uses an internet connection and browser WebRTC; later, a telephony provider or carrier integration can bridge an ordinary feature-phone call into the same trusted agent layer.
 
@@ -85,7 +85,7 @@ The intended end-to-end workflow is:
 7. An authorized staff member can confirm, reject, correct, or escalate the request.
 8. Tulu communicates the verified result or creates a follow-up reference for the caller.
 
-Steps 4–8 are future work. Tulu must never claim that an appointment is booked, medicine is available, a clinician is present, or emergency help has been dispatched unless an authoritative system or authorized staff member has confirmed that result.
+The `dash` branch demonstrates steps 6–8 locally with synthetic data; real facility lookup, persistence, authorization, and caller follow-up remain future work. Tulu must never claim that an appointment is booked, medicine is available, a clinician is present, or emergency help has been dispatched unless an authoritative system or authorized staff member has confirmed that result.
 
 ## Repository structure
 
@@ -104,7 +104,10 @@ tulu-web/
 │   │   ├── index.html
 │   │   ├── package.json
 │   │   └── vite.config.ts                Local /api proxy to the Agent API
-│   └── main-dash/                         Facility dashboard workspace
+│   └── main-dash/                         Next.js facility dashboard prototype
+│       ├── app/                            App Router pages and workflow states
+│       ├── components/                     Queue, detail, facility, and shared UI
+│       └── lib/mock-data.ts                Synthetic development data
 ├── services/
 │   └── agent-api/
 │       ├── src/
@@ -132,6 +135,7 @@ tulu-web/
 - Shared TypeScript request/response contracts between the browser and API, with runtime validation at each trust boundary.
 - Lucide React icons and plain responsive CSS with no UI-framework dependency.
 - Node's built-in test runner with mocked OpenAI responses for repeatable API tests.
+- Next.js App Router, React, TypeScript, and plain responsive CSS for the facility dashboard prototype.
 
 Technology for the facility dashboard, persistent operational data, real tools, and PSTN access has not yet been selected or implemented.
 
@@ -251,7 +255,7 @@ The workspaces are separated so the caller experience, facility dashboard, and A
 
 - Application directory: `apps/main-dash`
 - Intended access: authenticated facility staff only
-- Status: not implemented
+- Status: local workflow prototype on `dash`; Auth0, persistence, and Agent API integration are pending
 
 ### Agent API
 
@@ -321,9 +325,12 @@ The current prompts prohibit the agent from pretending that it checked a facilit
 ### Phase 4 — Facility dashboard
 
 - [ ] Authentication and role-based access
-- [ ] Live request queue
-- [ ] Facility, clinician, service, and inventory updates
-- [ ] Confirm, reject, correct, and escalate actions
+- [x] Local synthetic request queue and filters
+- [x] Local facility information editing workflow
+- [x] Confirm, reject, clarify, escalate, and resolve demo actions
+- [x] Assignment, notes, and audit-trail demo workflows
+- [ ] Live request queue backed by persistent data
+- [ ] Facility, clinician, service, and inventory updates through trusted tools
 - [ ] Operational alerts and response-time metrics
 
 ### Phase 5 — Telephone access and pilots
