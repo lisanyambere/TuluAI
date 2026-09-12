@@ -3,6 +3,7 @@ import {
   type LiveSessionResponse,
 } from "@tulu/shared";
 import OpenAI from "openai";
+import type { FunctionTool } from "openai/resources/live/live";
 
 import type {
   CreateLiveSessionInput,
@@ -27,6 +28,9 @@ export interface OpenAILiveSdk {
           responses: {
             model: "gpt-5.6-terra";
             instructions: string;
+            parallel_tool_calls?: boolean;
+            tool_choice?: "auto";
+            tools?: FunctionTool[];
           };
         };
       };
@@ -36,6 +40,11 @@ export interface OpenAILiveSdk {
       };
     }): Promise<unknown>;
   };
+}
+
+export interface OpenAILiveSessionClientOptions {
+  responsesTools?: readonly FunctionTool[];
+  onSessionCreated?: (sessionId: string) => void | Promise<void>;
 }
 
 export class InvalidLiveSessionResponseError extends Error {
@@ -48,6 +57,7 @@ export class InvalidLiveSessionResponseError extends Error {
 export function createOpenAILiveSessionClient(
   apiKey: string,
   sdk?: OpenAILiveSdk,
+  options: OpenAILiveSessionClientOptions = {},
 ): LiveSessionClient {
   const openAI = sdk ? undefined : new OpenAI({ apiKey, maxRetries: 0 });
   const client: OpenAILiveSdk =
@@ -96,6 +106,13 @@ export function createOpenAILiveSessionClient(
             responses: {
               model: input.backendModel,
               instructions: input.backendInstructions,
+              ...(options.responsesTools && options.responsesTools.length > 0
+                ? {
+                    parallel_tool_calls: true,
+                    tool_choice: "auto" as const,
+                    tools: [...options.responsesTools],
+                  }
+                : {}),
             },
           },
         },
@@ -107,6 +124,7 @@ export function createOpenAILiveSessionClient(
 
       const validated = validateLiveSessionResponse(result);
       if (!validated.success) throw new InvalidLiveSessionResponseError();
+      await options.onSessionCreated?.(validated.data.session.id);
       return validated.data;
     },
   };

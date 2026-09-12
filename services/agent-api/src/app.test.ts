@@ -19,8 +19,11 @@ const config: AgentApiConfig = {
   liveModel: "gpt-live-1",
   backendModel: "gpt-5.6-terra",
   allowedOrigins: new Set([allowedOrigin]),
+  operationsAllowedOrigins: new Set([allowedOrigin]),
   rateLimitWindowMs: 60_000,
   rateLimitMax: 6,
+  operationsRateLimitWindowMs: 60_000,
+  operationsRateLimitMax: 120,
   trustProxy: false,
 };
 const silentLogger: SafeLogger = { info: () => {}, error: () => {} };
@@ -38,9 +41,20 @@ afterEach(async () => {
   servers.clear();
 });
 
-async function startServer(liveSessionClient: LiveSessionClient, rateLimiter?: FixedWindowRateLimiter) {
+async function startServer(
+  liveSessionClient: LiveSessionClient,
+  rateLimiter?: FixedWindowRateLimiter,
+  operationsRateLimiter?: FixedWindowRateLimiter,
+  handlerConfig: AgentApiConfig = config,
+) {
   const server = createServer(
-    createApiHandler({ config, liveSessionClient, rateLimiter, logger: silentLogger }),
+    createApiHandler({
+      config: handlerConfig,
+      liveSessionClient,
+      rateLimiter,
+      operationsRateLimiter,
+      logger: silentLogger,
+    }),
   );
   servers.add(server);
   await new Promise<void>((resolve, reject) => {
@@ -81,6 +95,165 @@ describe("Tulu agent API", () => {
       service: "tulu-agent-api",
     });
     assert.equal(calls, 0);
+  });
+
+  it("serves one explicitly synthetic operational snapshot without contacting OpenAI", async () => {
+    let calls = 0;
+    const baseUrl = await startServer(
+      mockClient(async () => {
+        calls += 1;
+        throw new Error("must not be called");
+      }),
+    );
+
+    const response = await fetch(`${baseUrl}/api/v1/operations/snapshot`);
+    const body = (await response.json()) as {
+      synthetic: boolean;
+      datasetVersion: string;
+      facilities: Array<{ name: string; synthetic: boolean }>;
+      services: unknown[];
+      inventory: unknown[];
+    };
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("x-tulu-data-mode"), "synthetic");
+    assert.equal(response.headers.get("x-tulu-dataset-version"), "1");
+    assert.equal(body.synthetic, true);
+    assert.equal(body.datasetVersion, "1");
+    assert.ok(body.facilities.length > 0);
+    assert.ok(body.facilities.every((facility) => facility.synthetic));
+    assert.ok(body.facilities.every((facility) => /demo/i.test(facility.name)));
+    assert.ok(body.services.length > 0);
+    assert.ok(body.inventory.length > 0);
+    assert.equal(calls, 0);
+  });
+
+  it("exposes validated read-only lookup routes to an approved dashboard origin", async () => {
+    const baseUrl = await startServer(mockClient());
+
+    const response = await fetch(
+      `${baseUrl}/api/v1/operations/service-availability?service=general%20consultation&location=north%20ridge`,
+      { headers: { Origin: allowedOrigin } },
+    );
+    const body = (await response.json()) as {
+      synthetic: boolean;
+      count: number;
+      matches: Array<{ facility: { id: string } }>;
+    };
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("access-control-allow-origin"), allowedOrigin);
+    assert.equal(body.synthetic, true);
+    assert.equal(body.count, 1);
+    assert.equal(
+      body.matches[0]?.facility.id,
+      "facility-north-ridge-demo",
+    );
+  });
+
+  it("rejects unexpected operational query fields and non-read methods", async () => {
+    const baseUrl = await startServer(mockClient());
+
+    const invalidQuery = await fetch(
+      `${baseUrl}/api/v1/operations/inventory?item=salts&patientName=private`,
+    );
+    const invalidBody = (await invalidQuery.json()) as {
+      error: { code: string; issues: string[] };
+    };
+    assert.equal(invalidQuery.status, 400);
+    assert.equal(invalidBody.error.code, "invalid_request");
+    assert.deepEqual(invalidBody.error.issues, [
+      "unexpected query parameter: patientName",
+    ]);
+
+    const mutation = await fetch(`${baseUrl}/api/v1/operations/snapshot`, {
+      method: "POST",
+    });
+    assert.equal(mutation.status, 405);
+    assert.equal(mutation.headers.get("allow"), "GET, OPTIONS");
+  });
+
+  it("keeps operations-read rate limits separate from Live session limits", async () => {
+    const baseUrl = await startServer(
+      mockClient(),
+      new FixedWindowRateLimiter(1, 60_000),
+      new FixedWindowRateLimiter(1, 60_000),
+    );
+
+    assert.equal(
+      (await fetch(`${baseUrl}/api/v1/operations/snapshot`)).status,
+      200,
+    );
+    assert.equal(
+      (await fetch(`${baseUrl}/api/v1/operations/snapshot`)).status,
+      429,
+    );
+
+    const liveResponse = await fetch(`${baseUrl}/api/live/sessions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Origin: allowedOrigin },
+      body: JSON.stringify({
+        sdp: "offer-sdp",
+        language: "en",
+        consentAcknowledged: true,
+      }),
+    });
+    assert.equal(liveResponse.status, 201);
+  });
+
+  it("keeps dashboard-read and caller-session origins separated end to end", async () => {
+    const dashboardOrigin = "http://localhost:3000";
+    const separatedConfig: AgentApiConfig = {
+      ...config,
+      allowedOrigins: new Set([allowedOrigin]),
+      operationsAllowedOrigins: new Set([dashboardOrigin]),
+    };
+    const baseUrl = await startServer(
+      mockClient(),
+      undefined,
+      undefined,
+      separatedConfig,
+    );
+
+    const dashboardRead = await fetch(
+      `${baseUrl}/api/v1/operations/snapshot`,
+      { headers: { Origin: dashboardOrigin } },
+    );
+    assert.equal(dashboardRead.status, 200);
+
+    const dashboardLive = await fetch(`${baseUrl}/api/live/sessions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: dashboardOrigin,
+      },
+      body: JSON.stringify({
+        sdp: "offer-sdp",
+        language: "en",
+        consentAcknowledged: true,
+      }),
+    });
+    assert.equal(dashboardLive.status, 403);
+
+    const callerOperations = await fetch(
+      `${baseUrl}/api/v1/operations/snapshot`,
+      { headers: { Origin: allowedOrigin } },
+    );
+    assert.equal(callerOperations.status, 403);
+
+    const callerLive = await fetch(`${baseUrl}/api/live/sessions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: allowedOrigin,
+      },
+      body: JSON.stringify({
+        sdp: "offer-sdp",
+        language: "en",
+        consentAcknowledged: true,
+      }),
+    });
+    assert.equal(callerLive.status, 201);
   });
 
   it("rejects an unapproved browser origin", async () => {
@@ -158,7 +331,8 @@ describe("Tulu agent API", () => {
     assert.equal(received?.liveModel, "gpt-live-1");
     assert.equal(received?.backendModel, "gpt-5.6-terra");
     assert.match(received?.liveInstructions ?? "", /Kiswahili/);
-    assert.match(received?.backendInstructions ?? "", /No custom functions/);
+    assert.match(received?.backendInstructions ?? "", /find_facilities/);
+    assert.match(received?.backendInstructions ?? "", /fictional Tulu dataset/);
   });
 
   it("limits repeated chargeable session creation attempts", async () => {

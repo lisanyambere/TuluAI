@@ -9,6 +9,11 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { AgentApiConfig } from "./config.js";
 import type { LiveSessionClient } from "./live/live-session-client.js";
+import { handleOperationsRequest } from "./operations/http.js";
+import {
+  createSyntheticOperationalRepository,
+  type SyntheticOperationalRepository,
+} from "./operations/repository.js";
 import { buildBackendPrompt } from "./prompts/backend-prompt.js";
 import { buildLivePrompt } from "./prompts/live-prompt.js";
 import { FixedWindowRateLimiter } from "./rate-limit.js";
@@ -24,6 +29,8 @@ export interface AppDependencies {
   config: AgentApiConfig;
   liveSessionClient: LiveSessionClient;
   rateLimiter?: FixedWindowRateLimiter;
+  operationsRateLimiter?: FixedWindowRateLimiter;
+  operationsRepository?: SyntheticOperationalRepository;
   logger?: SafeLogger;
 }
 
@@ -129,6 +136,11 @@ export function createApiHandler({
     config.rateLimitMax,
     config.rateLimitWindowMs,
   ),
+  operationsRateLimiter = new FixedWindowRateLimiter(
+    config.operationsRateLimitMax,
+    config.operationsRateLimitWindowMs,
+  ),
+  operationsRepository = createSyntheticOperationalRepository(),
   logger = defaultLogger,
 }: AppDependencies) {
   return async (request: IncomingMessage, response: ServerResponse) => {
@@ -141,6 +153,22 @@ export function createApiHandler({
 
       if (request.method === "GET" && url.pathname === "/health") {
         sendJson(response, 200, { status: "ok", service: "tulu-agent-api" });
+        return;
+      }
+
+      if (
+        await handleOperationsRequest({
+          request,
+          response,
+          url,
+          requestId,
+          clientAddress: clientAddress(request, config.trustProxy),
+          allowedOrigins: config.operationsAllowedOrigins,
+          repository: operationsRepository,
+          rateLimiter: operationsRateLimiter,
+          logger,
+        })
+      ) {
         return;
       }
 

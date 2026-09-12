@@ -76,6 +76,64 @@ describe("OpenAI Live SDK adapter", () => {
     });
   });
 
+  it("registers delegated tools and attaches the trusted sideband after validation", async () => {
+    let payload: Parameters<OpenAILiveSdk["live"]["create"]>[0] | undefined;
+    const attachedSessionIds: string[] = [];
+    const sdk: OpenAILiveSdk = {
+      live: {
+        create: async (input) => {
+          payload = input;
+          return {
+            session: { id: "sess_tools" },
+            transport: { type: "webrtc", sdp: "answer-sdp" },
+          };
+        },
+      },
+    };
+    const tools = [
+      {
+        type: "function" as const,
+        name: "find_facilities",
+        strict: true,
+        parameters: {
+          type: "object",
+          properties: {},
+          required: [],
+          additionalProperties: false,
+        },
+      },
+    ];
+    const client = createOpenAILiveSessionClient("not-a-real-key", sdk, {
+      responsesTools: tools,
+      onSessionCreated: (sessionId) => {
+        attachedSessionIds.push(sessionId);
+      },
+    });
+
+    await client.create({
+      sdp: "offer-sdp",
+      language: "en",
+      liveModel: "gpt-live-1",
+      backendModel: "gpt-5.6-terra",
+      liveInstructions: "live instructions",
+      backendInstructions: "backend instructions",
+    });
+
+    assert.deepEqual(
+      payload?.session.delegation.responses.tools,
+      tools,
+    );
+    assert.equal(
+      payload?.session.delegation.responses.tool_choice,
+      "auto",
+    );
+    assert.equal(
+      payload?.session.delegation.responses.parallel_tool_calls,
+      true,
+    );
+    assert.deepEqual(attachedSessionIds, ["sess_tools"]);
+  });
+
   it("rejects malformed SDK responses", async () => {
     const sdk: OpenAILiveSdk = {
       live: { create: async () => ({ unexpected: true }) },
@@ -92,6 +150,47 @@ describe("OpenAI Live SDK adapter", () => {
         backendInstructions: "backend instructions",
       }),
       InvalidLiveSessionResponseError,
+    );
+  });
+
+  it("does not return a tool-enabled session when trusted attachment fails", async () => {
+    const sdk: OpenAILiveSdk = {
+      live: {
+        create: async () => ({
+          session: { id: "sess_without_sideband" },
+          transport: { type: "webrtc", sdp: "answer-sdp" },
+        }),
+      },
+    };
+    const client = createOpenAILiveSessionClient("not-a-real-key", sdk, {
+      responsesTools: [
+        {
+          type: "function",
+          name: "find_facilities",
+          strict: true,
+          parameters: {
+            type: "object",
+            properties: {},
+            required: [],
+            additionalProperties: false,
+          },
+        },
+      ],
+      onSessionCreated: async () => {
+        throw new Error("sideband unavailable");
+      },
+    });
+
+    await assert.rejects(
+      client.create({
+        sdp: "offer-sdp",
+        language: "en",
+        liveModel: "gpt-live-1",
+        backendModel: "gpt-5.6-terra",
+        liveInstructions: "live instructions",
+        backendInstructions: "backend instructions",
+      }),
+      /sideband unavailable/,
     );
   });
 });

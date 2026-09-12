@@ -14,11 +14,12 @@
     "start": "node --env-file-if-exists=.env dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "pnpm --filter @tulu/shared build",
-    "test": "node --import tsx --test src/*.test.ts"
+    "test": "node --import tsx --test src/*.test.ts src/operations/*.test.ts"
   },
   "dependencies": {
     "@tulu/shared": "workspace:*",
-    "openai": "^7.15.0"
+    "openai": "^7.15.0",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
     "@types/node": "^22.20.2",

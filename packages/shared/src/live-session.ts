@@ -21,6 +21,7 @@ export interface LiveSessionResponse {
 }
 
 export type ApiErrorCode =
+  | "internal_error"
   | "invalid_request"
   | "method_not_allowed"
   | "not_found"

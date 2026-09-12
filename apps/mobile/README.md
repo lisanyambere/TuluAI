@@ -26,4 +26,4 @@ VITE_AGENT_API_URL=https://api.example.com pnpm build:mobile
 
 For an independent deployment, use `apps/mobile` as the project root and `dist` as the build output directory.
 
-This experience uses browser audio rather than the mobile phone network. It does not dial a PSTN number, provide medical advice, dispatch emergency help, or submit a real healthcare request.
+This experience uses browser audio rather than the mobile phone network. Its agent can query only clearly labelled fictional fixture records. It does not dial a PSTN number, connect to a real facility, provide medical advice, dispatch emergency help, or submit a healthcare request.

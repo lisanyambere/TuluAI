@@ -83,7 +83,10 @@ importers:
         version: link:../../packages/shared
       openai:
         specifier: ^7.15.0
-        version: 7.15.0
+        version: 7.15.0(ws@8.21.3)
+      ws:
+        specifier: ^8.21.0
+        version: 8.21.3
     devDependencies:
       '@types/node':
         specifier: ^22.20.2
@@ -1024,6 +1027,18 @@ packages:
       yaml:
         optional: true
 
+  ws@8.21.3:
+    resolution: {integrity: sha512-201TZ/kPWxoPr/OKWjquZR1SWKXcvxdH+e1xrx89b3YbmzLMFCLfnaG1HFIgWzJOEWZ7MvpK++odZufgYR50Rw==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
 snapshots:
 
   '@auth0/nextjs-auth0@4.29.0(next@16.3.5(@types/node@22.20.2)(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-dom@19.3.0(react@19.3.0))(react@19.3.0)':
@@ -1520,7 +1535,9 @@ snapshots:
 
   oauth4webapi@3.8.8: {}
 
-  openai@7.15.0: {}
+  openai@7.15.0(ws@8.21.3):
+    optionalDependencies:
+      ws: 8.21.3
 
   openid-client@6.8.8:
     dependencies:
@@ -1677,3 +1694,5 @@ snapshots:
       esbuild: 0.28.2
       fsevents: 2.3.3
       tsx: 4.23.13
+
+  ws@8.21.3: {}

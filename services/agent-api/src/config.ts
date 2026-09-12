@@ -5,8 +5,11 @@ export interface AgentApiConfig {
   liveModel: "gpt-live-1";
   backendModel: "gpt-5.6-terra";
   allowedOrigins: ReadonlySet<string>;
+  operationsAllowedOrigins: ReadonlySet<string>;
   rateLimitWindowMs: number;
   rateLimitMax: number;
+  operationsRateLimitWindowMs: number;
+  operationsRateLimitMax: number;
   trustProxy: boolean;
 }
 
@@ -56,14 +59,12 @@ function readExactModel<T extends string>(
   return expected;
 }
 
-function readOrigins(env: NodeJS.ProcessEnv): ReadonlySet<string> {
-  const fallback = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:4173",
-    "http://127.0.0.1:4173",
-  ];
-  const candidates = env.WEB_ORIGINS?.split(",") ?? fallback;
+function readOrigins(
+  env: NodeJS.ProcessEnv,
+  name: string,
+  fallback: readonly string[],
+): ReadonlySet<string> {
+  const candidates = env[name]?.split(",") ?? fallback;
   const origins = new Set<string>();
 
   for (const candidate of candidates) {
@@ -74,19 +75,19 @@ function readOrigins(env: NodeJS.ProcessEnv): ReadonlySet<string> {
     try {
       url = new URL(raw);
     } catch {
-      throw new ConfigurationError("WEB_ORIGINS contains an invalid URL");
+      throw new ConfigurationError(`${name} contains an invalid URL`);
     }
 
     if (!["http:", "https:"].includes(url.protocol) || url.origin !== raw) {
       throw new ConfigurationError(
-        "WEB_ORIGINS entries must be exact http(s) origins without paths",
+        `${name} entries must be exact http(s) origins without paths`,
       );
     }
     origins.add(url.origin);
   }
 
   if (origins.size === 0) {
-    throw new ConfigurationError("WEB_ORIGINS must contain at least one origin");
+    throw new ConfigurationError(`${name} must contain at least one origin`);
   }
   return origins;
 }
@@ -112,13 +113,32 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AgentApiConfig
       "OPENAI_BACKEND_MODEL",
       "gpt-5.6-terra",
     ),
-    allowedOrigins: readOrigins(env),
+    allowedOrigins: readOrigins(env, "WEB_ORIGINS", [
+      "http://localhost:5173",
+      "http://127.0.0.1:5173",
+      "http://localhost:4173",
+      "http://127.0.0.1:4173",
+    ]),
+    operationsAllowedOrigins: readOrigins(env, "OPERATIONS_WEB_ORIGINS", [
+      "http://localhost:3000",
+      "http://127.0.0.1:3000",
+    ]),
     rateLimitWindowMs: readPositiveInteger(
       env,
       "RATE_LIMIT_WINDOW_MS",
       60_000,
     ),
     rateLimitMax: readPositiveInteger(env, "RATE_LIMIT_MAX", 6),
+    operationsRateLimitWindowMs: readPositiveInteger(
+      env,
+      "OPERATIONS_RATE_LIMIT_WINDOW_MS",
+      60_000,
+    ),
+    operationsRateLimitMax: readPositiveInteger(
+      env,
+      "OPERATIONS_RATE_LIMIT_MAX",
+      120,
+    ),
     trustProxy: readBoolean(env, "TRUST_PROXY", false),
   };
 }
