@@ -14,7 +14,7 @@ type DashboardShellProps = {
 };
 
 export function DashboardShell({ user, children }: DashboardShellProps) {
-  const { requests } = useDashboardData();
+  const { facility, requests } = useDashboardData();
   const openRequestCount = requests.filter((request) => request.status !== "resolved").length;
   const displayName = user.name || user.email || "Facility staff";
   const initials = displayName
@@ -55,8 +55,14 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
           <div className="facility-switcher">
             <span className="facility-switcher__dot" aria-hidden="true" />
             <div>
-              <strong>Maralal CHC</strong>
-              <span>Connected workspace</span>
+              <strong>{facility.name}</strong>
+              <span>
+                {facility.dataSource === "agent_api"
+                  ? "Synthetic Agent API snapshot"
+                  : facility.dataSource === "local_modified"
+                    ? "Synthetic local edits"
+                    : "Synthetic local fallback"}
+              </span>
             </div>
           </div>
           <div className="user-card">

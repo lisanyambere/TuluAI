@@ -30,7 +30,7 @@ function getNextAction(request: TuluRequest) {
 }
 
 export function RequestQueue() {
-  const { requests } = useDashboardData();
+  const { facility, requests } = useDashboardData();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
 
@@ -63,11 +63,11 @@ export function RequestQueue() {
         <div>
           <p className="eyebrow">Today · Saturday, 12 September</p>
           <h1>Good morning, let’s keep people moving.</h1>
-          <p className="page-subtitle">Review what callers need before they make the journey to Maralal Community Health Centre.</p>
+          <p className="page-subtitle">Review what callers need before they make the journey to {facility.name}.</p>
         </div>
         <div className="header-signal">
           <span className="pulse-dot" aria-hidden="true" />
-          <span>Live request workspace</span>
+          <span>Local request prototype</span>
         </div>
       </div>
 

@@ -2,19 +2,37 @@
 
 Next.js facility-side application for Tulu facility staff.
 
-The dashboard lets facility staff review incoming requests, confirm current facility information, and coordinate human follow-up. Authentication is intentionally disabled during the initial workflow build and will be wired with Auth0 later. The dashboard should consume the agent API rather than contain agent credentials or privileged business logic in the browser.
+The dashboard lets facility staff review incoming requests, inspect current facility information, and prototype human follow-up. Authentication is intentionally disabled during this workflow build and will be wired with Auth0 later. OpenAI credentials and privileged agent logic remain in the Agent API; they must never be added to this application.
+
+## Current integration boundary
+
+The dashboard now loads its initial facility profile from the Agent API's read-only `GET /api/v1/operations/snapshot` endpoint. That server-side request uses the same immutable fictional facility and service records as the voice agent's tools. If the API is unavailable or returns an unexpected payload, the dashboard fails safely to an aligned, visibly labelled local fixture.
+
+This is a deliberately narrow first connection:
+
+- The facility profile is synthetic and read-only at the API boundary.
+- The request queue is still seeded from local demo records.
+- Status, assignment, note, and facility-form changes live only in browser memory.
+- A voice call does not create a dashboard request yet.
+- Auth0, persistent case storage, authenticated staff writes, and real facility sources remain future work.
 
 ## Local setup
 
-The current demo does not require environment variables or an Auth0 tenant. Run the dashboard from the repository root:
+Run the Agent API and dashboard together from the repository root:
 
 ```bash
 pnpm install
-pnpm dev:dash
+pnpm dev
 ```
 
-The dashboard currently uses a synthetic demo staff session and local request/facility data. Auth0 setup is documented in `.env.example` for the later integration step; credentials must never be committed.
+The caller opens at `http://localhost:5173`, the dashboard at `http://localhost:3000`, and the Agent API at `http://127.0.0.1:8787`. To work on only the dashboard and API, run `pnpm dev:agent` and `pnpm dev:dash` in separate terminals.
 
-The upstream `services/agent-api` currently provides the GPT-Live WebRTC session foundation only. It does not yet expose facility lookup, inventory, request persistence, or staff actions, so the dashboard keeps those workflows behind a local data provider until those contracts exist.
+`AGENT_API_URL` is server-only and defaults to `http://127.0.0.1:8787`. Set it in `apps/main-dash/.env.local` or in the hosting platform when the API is deployed elsewhere:
 
-When implemented, `apps/main-dash` can be configured as its own hosting project and deployment root.
+```dotenv
+AGENT_API_URL=https://api.example.org
+```
+
+Do not prefix it with `NEXT_PUBLIC_`; the current bootstrap is a server-to-server request. Auth0 placeholders are documented in `.env.example` for the later authentication step. Credentials must never be committed.
+
+`apps/main-dash` can be configured as its own hosting project and deployment root. The hosting service must be able to reach the configured Agent API URL.

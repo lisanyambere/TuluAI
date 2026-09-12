@@ -4,7 +4,7 @@ Tulu is a voice-led healthcare-access project for communities where making a pho
 
 The long-term product lets someone call a Tulu access line from an ordinary mobile phone, speak naturally in a supported local language, and ask practical questions before making a long journey to a health facility. Tulu can then coordinate with verified facility information and authorized staff through a separate operations dashboard.
 
-> **Current status:** this repository contains a working browser-to-OpenAI voice slice, three read-only agent tools backed by an immutable fictional dataset, and a facility-dashboard workflow prototype. After explicit consent, the caller experience establishes a full-duplex WebRTC session with `gpt-live-1`; the trusted Node.js API keeps the OpenAI key server-side, delegates reasoning to `gpt-5.6-terra`, and owns privileged tool execution through an authenticated sideband. The dashboard currently prototypes staff request workflows with local synthetic state. This remains a controlled demo: it does not place or receive a PSTN/mobile-network call, connect to a real facility, persist healthcare requests, perform authoritative writes, or dispatch emergency help.
+> **Current status:** this repository contains a working browser-to-OpenAI voice slice, three read-only agent tools backed by an immutable fictional dataset, and a facility-dashboard workflow prototype. After explicit consent, the caller experience establishes a full-duplex WebRTC session with `gpt-live-1`; the trusted Node.js API keeps the OpenAI key server-side, delegates reasoning to `gpt-5.6-terra`, and owns privileged tool execution through an authenticated sideband. The dashboard bootstraps its synthetic facility profile from the same Agent API dataset while keeping request and staff-action state local. This remains a controlled demo: it does not place or receive a PSTN/mobile-network call, connect to a real facility, persist healthcare requests, perform authoritative writes, or dispatch emergency help.
 
 ## Why Tulu exists
 
@@ -26,7 +26,7 @@ Tulu is separated into three independently deployable product surfaces plus a sh
 | Surface | Audience | Responsibility | Status |
 | --- | --- | --- | --- |
 | Mobile caller experience | Members of the public and hackathon judges | Simulates dialing a Tulu number and runs the real browser voice session | Working voice MVP |
-| Facility dashboard | Authorized facility teams | Reviews requests, updates operational information, confirms outcomes, and coordinates human follow-up | Working local workflow prototype; synthetic data only |
+| Facility dashboard | Authorized facility teams | Reviews requests, updates operational information, confirms outcomes, and coordinates human follow-up | Working prototype; API-backed synthetic facility profile and local request state |
 | Agent API | Trusted server-side infrastructure | Creates GPT-Live sessions, owns sideband tool execution, and exposes synthetic operational reads | Working voice gateway plus read-only synthetic tools; no writes or persistence |
 | Shared contracts | Mobile, dashboard, and Agent API | Defines Live-session, dashboard-request, and operational-data contracts | Implemented for the current voice, dashboard, and synthetic operations slices |
 
@@ -140,7 +140,7 @@ tulu-web/
 │   └── main-dash/                         Next.js facility dashboard prototype
 │       ├── app/                            App Router pages and workflow states
 │       ├── components/                     Queue, detail, facility, and shared UI
-│       └── lib/mock-data.ts                Synthetic development data
+│       └── lib/                            Agent API adapter and synthetic request fixtures
 ├── services/
 │   └── agent-api/
 │       ├── src/
@@ -221,22 +221,26 @@ You can confirm that the service is running without creating a chargeable voice 
 curl http://127.0.0.1:8787/health
 ```
 
+The dashboard loads its initial synthetic facility profile from the Agent API and falls back to the matching local fixture if the API cannot be reached.
+
 ## Available commands
 
 Run all commands from the repository root.
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm dev` | Start the Agent API and mobile app together |
+| `pnpm dev` | Start the Agent API, mobile app, and facility dashboard together |
 | `pnpm dev:stack` | Explicit alias for the full local stack |
 | `pnpm dev:agent` | Start only the Agent API |
 | `pnpm dev:mobile` | Start only the caller app |
+| `pnpm dev:dash` | Start only the facility dashboard |
 | `pnpm test` | Run tests in every workspace that provides them |
 | `pnpm test:agent` | Run the Agent API's mocked unit and HTTP tests |
 | `pnpm typecheck` | Type-check every workspace package that provides a typecheck script |
 | `pnpm build` | Build every workspace package that provides a build script |
 | `pnpm build:agent` | Build the shared package and Agent API |
 | `pnpm build:mobile` | Build only the caller app |
+| `pnpm build:dash` | Build only the facility dashboard |
 | `pnpm preview:mobile` | Preview the caller's production build locally |
 
 Before committing application changes, run:
@@ -278,6 +282,14 @@ Store these values in `services/agent-api/.env` for local development or in the 
 
 Only public configuration belongs in a `VITE_*` variable. For a separate production deployment, build the mobile app with `VITE_AGENT_API_URL` set to the HTTPS Agent API origin and add the mobile app's exact HTTPS origin to `WEB_ORIGINS`. Add the dashboard's origin to `OPERATIONS_WEB_ORIGINS`; adding it there does not grant permission to create chargeable voice sessions.
 
+### Facility dashboard
+
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `AGENT_API_URL` | No | `http://127.0.0.1:8787` | Server-only Agent API base URL used for the synthetic facility snapshot |
+
+Keep `AGENT_API_URL` server-only; do not rename it to a `NEXT_PUBLIC_*` variable. `OPERATIONS_WEB_ORIGINS` is still configured for the local Next.js origin so a future direct-browser read will not require broadening the chargeable Live-session origin list.
+
 ## Deployment model
 
 The workspaces are separated so the caller experience, facility dashboard, and API can become different deployment projects.
@@ -294,7 +306,7 @@ The workspaces are separated so the caller experience, facility dashboard, and A
 
 - Application directory: `apps/main-dash`
 - Intended access: authenticated facility staff only
-- Status: local workflow prototype; Auth0, request persistence, and authenticated staff writes are pending
+- Status: local workflow prototype with a server-side synthetic facility snapshot; Auth0, request persistence, and authenticated staff writes are pending
 
 ### Agent API
 

@@ -34,7 +34,22 @@ export function FacilityEditor() {
           <h1>{facility.name}</h1>
           <p className="page-subtitle">Keep the facts callers rely on current and easy to verify.</p>
         </div>
-        <span className="status-badge status-badge--verified">Demo editing enabled</span>
+        <span className="status-badge status-badge--verified">
+          {facility.dataSource === "agent_api"
+            ? "Agent API · synthetic"
+            : facility.dataSource === "local_modified"
+              ? "Locally edited · synthetic"
+              : "Local fallback · synthetic"}
+        </span>
+      </div>
+
+      <div className="callout callout--neutral facility-source-note">
+        {facility.dataSource === "agent_api"
+          ? "This profile was loaded from the Agent API's synthetic operational snapshot."
+          : facility.dataSource === "local_modified"
+            ? "This profile now includes unpersisted local demo edits."
+            : "The Agent API snapshot is unavailable, so this profile uses the aligned local fallback."}{" "}
+        Request workflows and edits remain local to this browser in the current MVP.
       </div>
 
       {notice && <div className="callout callout--success" role="status">{notice}</div>}

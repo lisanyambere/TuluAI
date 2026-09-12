@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
+    "predev": "pnpm --filter @tulu/shared build",
     "dev": "next dev",
+    "prebuild": "pnpm --filter @tulu/shared build",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit"

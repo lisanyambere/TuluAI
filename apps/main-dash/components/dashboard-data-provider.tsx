@@ -147,7 +147,12 @@ export function DashboardDataProvider({
   }, []);
 
   const updateFacility = useCallback((updates: Partial<FacilityProfile>) => {
-    setFacility((current) => ({ ...current, ...updates, lastReviewedAt: eventTime() }));
+    setFacility((current) => ({
+      ...current,
+      ...updates,
+      dataSource: "local_modified",
+      lastReviewedAt: eventTime(),
+    }));
   }, []);
 
   const value = useMemo(
