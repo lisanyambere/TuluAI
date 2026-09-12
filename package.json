@@ -8,11 +8,16 @@
     "pnpm": ">=10.0.0"
   },
   "scripts": {
-    "dev": "pnpm --filter @tulu/mobile dev",
+    "dev": "pnpm run dev:stack",
+    "dev:stack": "pnpm --parallel --filter @tulu/agent-api --filter @tulu/mobile dev",
+    "dev:agent": "pnpm --filter @tulu/agent-api dev",
     "dev:mobile": "pnpm --filter @tulu/mobile dev",
     "build": "pnpm -r --if-present run build",
+    "build:agent": "pnpm --filter @tulu/agent-api build",
     "build:mobile": "pnpm --filter @tulu/mobile build",
     "preview:mobile": "pnpm --filter @tulu/mobile preview",
+    "test": "pnpm -r --if-present run test",
+    "test:agent": "pnpm --filter @tulu/agent-api test",
     "typecheck": "pnpm -r --if-present run typecheck"
   }
 }

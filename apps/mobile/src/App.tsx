@@ -17,8 +17,9 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
+import { useLiveVoiceCall, type LiveVoiceLanguage } from "./features/voice/useLiveVoiceCall";
 
-type CallStage = "idle" | "dialing" | "active" | "ended";
+type CallStage = "idle" | "consent" | "dialing" | "active" | "ended";
 
 type KeyDefinition = {
   value: string;
@@ -99,9 +100,9 @@ function Keypad({ onKey, compact = false }: { onKey: (key: string) => void; comp
   );
 }
 
-function Waveform({ muted }: { muted: boolean }) {
+function Waveform({ paused }: { paused: boolean }) {
   return (
-    <div className={muted ? "waveform waveform--paused" : "waveform"} aria-hidden="true">
+    <div className={paused ? "waveform waveform--paused" : "waveform"} aria-hidden="true">
       {[0, 1, 2, 3, 4].map((bar) => (
         <span key={bar} style={{ animationDelay: `${bar * 90}ms` }} />
       ))}
@@ -110,16 +111,16 @@ function Waveform({ muted }: { muted: boolean }) {
 }
 
 function App() {
+  const voice = useLiveVoiceCall();
   const [stage, setStage] = useState<CallStage>("idle");
   const [number, setNumber] = useState("");
   const [duration, setDuration] = useState(0);
-  const [muted, setMuted] = useState(false);
-  const [speaker, setSpeaker] = useState(true);
   const [showKeypad, setShowKeypad] = useState(false);
   const [showCaption, setShowCaption] = useState(true);
   const [language, setLanguage] = useState<"EN" | "SW">("EN");
   const [dialedDuringCall, setDialedDuringCall] = useState("");
   const stageFocusRef = useRef<HTMLDivElement>(null);
+  const consentContinueRef = useRef<HTMLButtonElement>(null);
   const inCallKeypadRef = useRef<HTMLDivElement>(null);
   const keypadToggleRef = useRef<HTMLButtonElement>(null);
   const previousStage = useRef<CallStage>(stage);
@@ -133,8 +134,6 @@ function App() {
   }, []);
 
   const resetControls = useCallback(() => {
-    setMuted(false);
-    setSpeaker(true);
     setShowKeypad(false);
     setShowCaption(true);
     setDialedDuringCall("");
@@ -142,27 +141,52 @@ function App() {
 
   const startCall = useCallback(() => {
     if (!number) return;
+    setStage("consent");
+  }, [number]);
+
+  const connectCall = useCallback(() => {
     resetControls();
     setDuration(0);
     setStage("dialing");
-  }, [number, resetControls]);
+    void voice.start({
+      language: language.toLowerCase() as LiveVoiceLanguage,
+      consentAcknowledged: true,
+    });
+  }, [language, resetControls, voice]);
 
   const endCall = useCallback(() => {
     setShowKeypad(false);
     setStage("ended");
-  }, []);
+    void voice.end();
+  }, [voice]);
 
   const startAgain = useCallback(() => {
+    voice.reset();
     resetControls();
     setDuration(0);
     setStage("idle");
-  }, [resetControls]);
+  }, [resetControls, voice]);
 
   useEffect(() => {
-    if (stage !== "dialing") return;
-    const connectionTimer = window.setTimeout(() => setStage("active"), 1750);
-    return () => window.clearTimeout(connectionTimer);
-  }, [stage]);
+    if (voice.status === "connected" && stage === "dialing") {
+      setStage("active");
+    }
+
+    if (voice.status === "error" && stage === "dialing") {
+      setStage("idle");
+    }
+
+    if (voice.status === "error" && stage === "active") {
+      setStage("ended");
+    }
+
+    if (
+      voice.status === "ended" &&
+      (stage === "dialing" || stage === "active")
+    ) {
+      setStage("ended");
+    }
+  }, [stage, voice.status]);
 
   useEffect(() => {
     if (stage !== "active") return;
@@ -175,7 +199,10 @@ function App() {
     previousStage.current = stage;
     if (priorStage === stage) return;
 
-    const frame = window.requestAnimationFrame(() => stageFocusRef.current?.focus());
+    const frame = window.requestAnimationFrame(() => {
+      if (stage === "consent") consentContinueRef.current?.focus();
+      else stageFocusRef.current?.focus();
+    });
     return () => window.cancelAnimationFrame(frame);
   }, [stage]);
 
@@ -199,6 +226,10 @@ function App() {
         if (event.key === "Enter" && number) startCall();
       }
 
+      if (stage === "consent" && event.key === "Escape") {
+        setStage("idle");
+      }
+
       if ((stage === "dialing" || stage === "active") && event.key === "Escape") {
         endCall();
       }
@@ -210,8 +241,20 @@ function App() {
 
   const handleInCallKey = (key: string) => {
     setDialedDuringCall((current) => `${current}${key}`.slice(-8));
-    if (key === "1") setLanguage("SW");
-    if (key === "2") setLanguage("EN");
+    if (key === "1") {
+      setLanguage("SW");
+      voice.changeLanguage("sw");
+    }
+    if (key === "2") {
+      setLanguage("EN");
+      voice.changeLanguage("en");
+    }
+  };
+
+  const toggleLanguage = () => {
+    const nextLanguage = language === "EN" ? "SW" : "EN";
+    setLanguage(nextLanguage);
+    voice.changeLanguage(nextLanguage.toLowerCase() as LiveVoiceLanguage);
   };
 
   return (
@@ -234,7 +277,7 @@ function App() {
           </div>
         </div>
         <p className="story-panel__note">
-          Interface prototype · No real phone call, medical advice, or emergency request is placed.
+          Browser voice demo · No phone-network call, medical advice, or emergency request is placed.
         </p>
       </section>
 
@@ -242,6 +285,13 @@ function App() {
         <div className={`phone-surface phone-surface--${stage}`}>
           <div className="ambient ambient--one" />
           <div className="ambient ambient--two" />
+          <audio
+            ref={voice.remoteAudioRef}
+            className="remote-audio"
+            autoPlay
+            playsInline
+            aria-hidden="true"
+          />
 
           <header className="phone-header">
             <div className="phone-header__brand">
@@ -253,14 +303,22 @@ function App() {
             </div>
           </header>
 
-          {stage === "idle" && (
+          {(stage === "idle" || stage === "consent") && (
             <div
               className="dialer-view stage-panel"
               ref={stageFocusRef}
               tabIndex={-1}
               aria-label="Demo dialer ready"
+              aria-hidden={stage === "consent"}
+              inert={stage === "consent"}
             >
               <div className="dialer-view__number" aria-live="polite">
+                {voice.error && stage === "idle" && (
+                  <div className="connection-alert" role="alert">
+                    <strong>Couldn’t connect</strong>
+                    <span>{voice.error}</span>
+                  </div>
+                )}
                 <span className={number ? "number-display" : "number-display number-display--empty"}>
                   {number ? displayNumber : "Enter number"}
                 </span>
@@ -325,21 +383,78 @@ function App() {
             </div>
           )}
 
+          {stage === "consent" && (
+            <div className="consent-layer">
+              <section
+                className="consent-sheet"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="consent-title"
+                aria-describedby="consent-description"
+              >
+                <div className="consent-sheet__handle" aria-hidden="true" />
+                <p className="eyebrow">Before we connect</p>
+                <h2 id="consent-title">AI voice demo</h2>
+                <p id="consent-description">
+                  By continuing, you agree that Tulu can send microphone audio to OpenAI and play
+                  AI-generated audio for this call. Tulu is not a doctor or emergency service. No
+                  phone-network call is placed. Please use demo information and do not share real
+                  patient details.
+                </p>
+                <fieldset className="language-choice">
+                  <legend>Conversation language</legend>
+                  <div>
+                    <button
+                      type="button"
+                      className={language === "EN" ? "language-choice__option language-choice__option--active" : "language-choice__option"}
+                      onClick={() => setLanguage("EN")}
+                      aria-pressed={language === "EN"}
+                    >
+                      English
+                    </button>
+                    <button
+                      type="button"
+                      className={language === "SW" ? "language-choice__option language-choice__option--active" : "language-choice__option"}
+                      onClick={() => setLanguage("SW")}
+                      aria-pressed={language === "SW"}
+                    >
+                      Kiswahili
+                    </button>
+                  </div>
+                </fieldset>
+                <div className="consent-sheet__actions">
+                  <button type="button" className="consent-cancel" onClick={() => setStage("idle")}>
+                    Not now
+                  </button>
+                  <button
+                    type="button"
+                    className="consent-continue"
+                    onClick={connectCall}
+                    ref={consentContinueRef}
+                  >
+                    Continue
+                    <Mic aria-hidden="true" />
+                  </button>
+                </div>
+              </section>
+            </div>
+          )}
+
           {(stage === "dialing" || stage === "active") && (
             <div
               className="call-view stage-panel"
               ref={stageFocusRef}
               tabIndex={-1}
-              aria-label={stage === "dialing" ? "Demo call is connecting" : "Simulated call connected"}
+              aria-label={stage === "dialing" ? "AI voice call is connecting" : "AI voice call connected"}
             >
               <div className="call-status" aria-live={stage === "dialing" ? "polite" : undefined}>
                 {stage === "dialing" ? (
                   <span className="call-status__connecting">
-                    <span /> Calling…
+                    <span /> {voice.status === "requesting-permission" ? "Microphone…" : "Calling…"}
                   </span>
                 ) : (
                   <>
-                    <span className="sr-only" role="status">Simulated call connected</span>
+                    <span className="sr-only" role="status">AI voice call connected</span>
                     <span
                       className="call-status__timer"
                       aria-label={`Elapsed demo call time ${formatDuration(duration)}`}
@@ -356,7 +471,7 @@ function App() {
                   {stage === "dialing" && <span className="call-identity__ring" />}
                 </div>
                 <p>{destinationName}</p>
-                <span>{displayNumber} · Browser simulation</span>
+                <span>{displayNumber} · Browser voice demo</span>
               </div>
 
               <div className="conversation-zone">
@@ -386,50 +501,49 @@ function App() {
                   </div>
                 ) : (
                   <div className="agent-presence">
-                    <div className={muted ? "agent-orb agent-orb--muted" : "agent-orb"}>
-                      <Waveform muted={muted} />
+                    <div className={!voice.speaker ? "agent-orb agent-orb--muted" : "agent-orb"}>
+                      <Waveform paused={stage !== "active" || !voice.activityMessage.includes("speaking")} />
                     </div>
-                    <div>
+                    <div role="status" aria-live="polite">
                       <strong>
-                        {muted
-                          ? "Demo mute is on"
-                          : stage === "dialing"
-                            ? "Preparing demo call"
-                            : "Simulated call connected"}
+                        {voice.muted ? "Microphone muted" : voice.activityMessage}
                       </strong>
                       <span>
                         {stage === "dialing"
-                          ? "No real call is being placed"
-                          : "No live microphone or audio in this build"}
+                          ? "Allow microphone access if your browser asks"
+                          : !voice.speaker
+                            ? "Speaker is off — Tulu cannot be heard"
+                            : "Live AI audio · No phone-network call"}
                       </span>
                     </div>
                   </div>
                 )}
 
                 {stage === "active" && showCaption && !showKeypad && (
-                  <div className="caption-card">
+                  <div className="caption-card" aria-live="polite">
                     <div className="caption-card__label">
                       <MessageSquareText aria-hidden="true" />
-                      Demo caption
+                      {voice.caption?.speaker ?? "Live captions"}
                     </div>
                     <p>
-                      {language === "EN"
-                        ? "Hello, you’re connected to the Tulu interface demo."
-                        : "Hujambo, umeunganishwa na mfano wa Tulu."}
+                      {voice.caption?.text ??
+                        (language === "EN"
+                          ? "You’re connected. Tulu will speak shortly."
+                          : "Umeunganishwa. Tulu atazungumza hivi karibuni.")}
                     </p>
                   </div>
                 )}
               </div>
 
-              <div className="call-controls" role="group" aria-label="Simulated call controls">
+              <div className="call-controls" role="group" aria-label="Voice call controls">
                 <button
                   type="button"
-                  className={muted ? "control-button control-button--active" : "control-button"}
-                  onClick={() => setMuted((current) => !current)}
-                  aria-pressed={muted}
+                  className={voice.muted ? "control-button control-button--active" : "control-button"}
+                  onClick={voice.toggleMute}
+                  aria-pressed={voice.muted}
                 >
-                  <span>{muted ? <MicOff aria-hidden="true" /> : <Mic aria-hidden="true" />}</span>
-                  <small>{muted ? "Unmute" : "Mute"}</small>
+                  <span>{voice.muted ? <MicOff aria-hidden="true" /> : <Mic aria-hidden="true" />}</span>
+                  <small>{voice.muted ? "Unmute" : "Mute"}</small>
                 </button>
                 <button
                   type="button"
@@ -443,11 +557,11 @@ function App() {
                 </button>
                 <button
                   type="button"
-                  className={speaker ? "control-button control-button--active" : "control-button"}
-                  onClick={() => setSpeaker((current) => !current)}
-                  aria-pressed={speaker}
+                  className={voice.speaker ? "control-button control-button--active" : "control-button"}
+                  onClick={voice.toggleSpeaker}
+                  aria-pressed={voice.speaker}
                 >
-                  <span>{speaker ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}</span>
+                  <span>{voice.speaker ? <Volume2 aria-hidden="true" /> : <VolumeX aria-hidden="true" />}</span>
                   <small>Speaker</small>
                 </button>
                 <button
@@ -462,7 +576,7 @@ function App() {
                 <button
                   type="button"
                   className="control-button"
-                  onClick={() => setLanguage((current) => (current === "EN" ? "SW" : "EN"))}
+                  onClick={toggleLanguage}
                 >
                   <span><Languages aria-hidden="true" /></span>
                   <small>{language}</small>
@@ -473,7 +587,7 @@ function App() {
                 </button>
               </div>
 
-              <button type="button" className="end-call-button" onClick={endCall} aria-label="End demo call">
+              <button type="button" className="end-call-button" onClick={endCall} aria-label="End voice call">
                 <PhoneOff aria-hidden="true" />
               </button>
             </div>
@@ -492,13 +606,15 @@ function App() {
               <p className="eyebrow">Demo complete</p>
               <h2>Call ended</h2>
               <p>
-                You explored the caller interface for {formatDuration(duration)}. No real call or healthcare request was placed.
+                {voice.error
+                  ? voice.error
+                  : `You spoke with the Tulu AI demo for ${formatDuration(duration)}. No phone-network call or healthcare request was placed.`}
               </p>
               <div className="ended-view__receipt">
                 <span>Destination</span>
                 <strong>{destinationName}</strong>
                 <span>Outcome</span>
-                <strong>Interface preview only</strong>
+                <strong>{voice.error ? "Connection ended" : "Voice demo complete"}</strong>
               </div>
               <button type="button" className="start-again-button" onClick={startAgain}>
                 <RotateCcw aria-hidden="true" />
